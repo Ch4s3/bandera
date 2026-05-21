@@ -12,7 +12,11 @@ defmodule Bandera.MixProject do
       # Incremental Dialyzer via `mix assay`:
       assay: [
         dialyzer: [
-          apps: :project_plus_deps,
+          # `:crypto` is an OTP app used at runtime (declared in
+          # `extra_applications`) but it is not part of the resolved dep tree,
+          # so the `:project_plus_deps` selector omits it. Add it explicitly so
+          # the PLT includes its specs and `:crypto.hash/2` resolves cleanly.
+          apps: [:project_plus_deps, :crypto],
           warning_apps: :project
         ]
       ]
