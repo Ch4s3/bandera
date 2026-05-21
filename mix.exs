@@ -35,7 +35,7 @@ defmodule Bandera.MixProject do
 
   defp deps do
     [
-      {:nimble_ownership, "~> 1.0", only: :test},
+      {:nimble_ownership, "~> 1.0", optional: true},
       {:stream_data, "~> 1.0", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:assay, "~> 0.5", only: [:dev, :test], runtime: false},
