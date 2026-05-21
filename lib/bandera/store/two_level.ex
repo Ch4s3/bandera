@@ -32,6 +32,7 @@ defmodule Bandera.Store.TwoLevel do
   def put(flag_name, gate) do
     with {:ok, flag} <- persistent().put(flag_name, gate) do
       refresh_cache(flag_name, flag)
+      Bandera.Notifications.publish_change(flag_name)
       {:ok, flag}
     end
   end
@@ -40,6 +41,7 @@ defmodule Bandera.Store.TwoLevel do
   def delete(flag_name, gate) do
     with {:ok, flag} <- persistent().delete(flag_name, gate) do
       refresh_cache(flag_name, flag)
+      Bandera.Notifications.publish_change(flag_name)
       {:ok, flag}
     end
   end
@@ -48,6 +50,7 @@ defmodule Bandera.Store.TwoLevel do
   def delete(flag_name) do
     with {:ok, flag} <- persistent().delete(flag_name) do
       refresh_cache(flag_name, flag)
+      Bandera.Notifications.publish_change(flag_name)
       {:ok, flag}
     end
   end

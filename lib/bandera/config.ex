@@ -13,13 +13,17 @@ defmodule Bandera.Config do
   @default_cache [enabled: true, ttl: 900]
   @default_persistence [adapter: Bandera.Store.Persistent.Memory]
   @default_store Bandera.Store.TwoLevel
+  @default_notifications [enabled: false, adapter: Bandera.Notifications.Redis]
 
   @type snapshot :: %{
           store: module,
           cache_enabled?: boolean,
           cache_ttl: non_neg_integer,
           persistence_adapter: module,
-          persistence: keyword
+          persistence: keyword,
+          notifications_enabled?: boolean,
+          notifications_adapter: module,
+          notifications: keyword
         }
 
   @doc "Re-read application env and rewrite the persistent_term snapshot."
@@ -62,18 +66,40 @@ defmodule Bandera.Config do
   @spec ecto_table_name() :: String.t()
   def ecto_table_name, do: Keyword.get(persistence(), :ecto_table_name, "bandera_flags")
 
+  @spec notifications_enabled?() :: boolean
+  def notifications_enabled?, do: snapshot().notifications_enabled?
+
+  @spec notifications_adapter() :: module
+  def notifications_adapter, do: snapshot().notifications_adapter
+
+  @spec notifications() :: keyword
+  def notifications, do: snapshot().notifications
+
+  @doc "Generate a random per-node id used to ignore self-published change notifications."
+  @spec build_unique_id() :: String.t()
+  def build_unique_id, do: 8 |> :crypto.strong_rand_bytes() |> Base.encode16(case: :lower)
+
   defp build_snapshot do
     cache = Keyword.merge(@default_cache, Application.get_env(:bandera, :cache, []))
 
     persistence =
       Keyword.merge(@default_persistence, Application.get_env(:bandera, :persistence, []))
 
+    notifications =
+      Keyword.merge(
+        @default_notifications,
+        Application.get_env(:bandera, :cache_bust_notifications, [])
+      )
+
     %{
       store: Application.get_env(:bandera, :store, @default_store),
       cache_enabled?: Keyword.fetch!(cache, :enabled),
       cache_ttl: Keyword.fetch!(cache, :ttl),
       persistence_adapter: Keyword.fetch!(persistence, :adapter),
-      persistence: persistence
+      persistence: persistence,
+      notifications_enabled?: Keyword.fetch!(notifications, :enabled),
+      notifications_adapter: Keyword.fetch!(notifications, :adapter),
+      notifications: notifications
     }
   end
 end

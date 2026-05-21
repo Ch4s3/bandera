@@ -40,4 +40,20 @@ defmodule Bandera.ConfigTest do
     assert Config.cache_enabled?() == true
     assert Config.cache_ttl() == 900
   end
+
+  test "notifications default to disabled with the Redis adapter" do
+    for {k, _} <- Application.get_all_env(:bandera), do: Application.delete_env(:bandera, k)
+    Config.reload()
+
+    assert Config.notifications_enabled?() == false
+    assert Config.notifications_adapter() == Bandera.Notifications.Redis
+  end
+
+  test "build_unique_id/0 returns distinct lowercase-hex ids" do
+    a = Config.build_unique_id()
+    b = Config.build_unique_id()
+    assert a =~ ~r/\A[0-9a-f]+\z/
+    assert a != b
+    assert String.length(a) == 16
+  end
 end
