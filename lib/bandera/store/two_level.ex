@@ -19,18 +19,18 @@ defmodule Bandera.Store.TwoLevel do
           {:ok, flag}
 
         {:miss, _reason} ->
-          with {:ok, flag} <- persistent().get(flag_name) do
+          with {:ok, flag} <- persistent_get(flag_name) do
             {:ok, Cache.put(flag)}
           end
       end
     else
-      persistent().get(flag_name)
+      persistent_get(flag_name)
     end
   end
 
   @impl Bandera.Store
   def put(flag_name, gate) do
-    with {:ok, flag} <- persistent().put(flag_name, gate) do
+    with {:ok, flag} <- persistent_put(flag_name, gate) do
       refresh_cache(flag_name, flag)
       Bandera.Notifications.publish_change(flag_name)
       {:ok, flag}
@@ -39,7 +39,7 @@ defmodule Bandera.Store.TwoLevel do
 
   @impl Bandera.Store
   def delete(flag_name, gate) do
-    with {:ok, flag} <- persistent().delete(flag_name, gate) do
+    with {:ok, flag} <- persistent_delete(flag_name, gate) do
       refresh_cache(flag_name, flag)
       Bandera.Notifications.publish_change(flag_name)
       {:ok, flag}
@@ -48,7 +48,7 @@ defmodule Bandera.Store.TwoLevel do
 
   @impl Bandera.Store
   def delete(flag_name) do
-    with {:ok, flag} <- persistent().delete(flag_name) do
+    with {:ok, flag} <- persistent_delete(flag_name) do
       refresh_cache(flag_name, flag)
       Bandera.Notifications.publish_change(flag_name)
       {:ok, flag}
@@ -56,12 +56,46 @@ defmodule Bandera.Store.TwoLevel do
   end
 
   @impl Bandera.Store
-  def all_flags, do: persistent().all_flags()
+  def all_flags do
+    Bandera.Telemetry.span([:persistence, :all_flags], %{}, fn ->
+      {persistent().all_flags(), %{}}
+    end)
+  end
 
   @impl Bandera.Store
-  def all_flag_names, do: persistent().all_flag_names()
+  def all_flag_names do
+    Bandera.Telemetry.span([:persistence, :all_flag_names], %{}, fn ->
+      {persistent().all_flag_names(), %{}}
+    end)
+  end
 
   defp persistent, do: Config.persistence_adapter()
+
+  # point-in-time: emitted only when the persistent adapter is actually read
+  # (i.e. on a cache miss), matching fun_with_flags' read semantics.
+  defp persistent_get(flag_name) do
+    result = persistent().get(flag_name)
+    Bandera.Telemetry.event([:persistence, :get], %{flag_name: flag_name})
+    result
+  end
+
+  defp persistent_put(flag_name, gate) do
+    Bandera.Telemetry.span([:persistence, :put], %{flag_name: flag_name, gate: gate}, fn ->
+      {persistent().put(flag_name, gate), %{}}
+    end)
+  end
+
+  defp persistent_delete(flag_name, gate) do
+    Bandera.Telemetry.span([:persistence, :delete], %{flag_name: flag_name, gate: gate}, fn ->
+      {persistent().delete(flag_name, gate), %{}}
+    end)
+  end
+
+  defp persistent_delete(flag_name) do
+    Bandera.Telemetry.span([:persistence, :delete], %{flag_name: flag_name}, fn ->
+      {persistent().delete(flag_name), %{}}
+    end)
+  end
 
   # Keep the cache consistent on writes: refresh when enabled, otherwise drop any
   # stale entry so it can't reappear if the cache is later re-enabled.

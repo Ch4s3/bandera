@@ -9,6 +9,7 @@ defmodule Bandera.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      test_coverage: [threshold: 85],
       # Incremental Dialyzer via `mix assay`:
       assay: [
         dialyzer: [
@@ -35,6 +36,7 @@ defmodule Bandera.MixProject do
 
   defp deps do
     [
+      {:telemetry, "~> 1.0"},
       # Backs Bandera.Store.ProcessScoped (the test layer). optional: available in
       # Bandera's own builds; not forced on consumers. Apps using the test layer add
       # {:nimble_ownership, "~> 1.0", only: :test} to their own deps.
