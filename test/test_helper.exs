@@ -1,3 +1,3 @@
 ExUnit.start()
 
-Bandera.Store.ProcessScoped.start_link()
+Bandera.Test.start()
