@@ -70,15 +70,23 @@ defmodule Bandera.Flag do
 
   defp check_boolean_gate(gates) do
     case Enum.find(gates, &Gate.boolean?/1) do
-      nil -> false
-      gate -> elem(Gate.enabled?(gate), 1)
+      nil ->
+        false
+
+      gate ->
+        {:ok, enabled} = Gate.enabled?(gate)
+        enabled
     end
   end
 
   defp check_percentage_of_time_gate(gates) do
     case Enum.find(gates, &Gate.percentage_of_time?/1) do
-      nil -> false
-      gate -> elem(Gate.enabled?(gate), 1)
+      nil ->
+        false
+
+      gate ->
+        {:ok, enabled} = Gate.enabled?(gate)
+        enabled
     end
   end
 end

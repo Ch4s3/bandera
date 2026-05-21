@@ -44,4 +44,27 @@ defmodule Bandera.FlagTest do
     assert result == Gate.score(actor, :my_flag) <= 0.5
     assert Flag.enabled?(flag, for: actor) == result
   end
+
+  test "group gates fall through to the boolean gate when the actor is in no group" do
+    gates = [Gate.new(:boolean, true), Gate.new(:group, :admin, false)]
+    flag = Flag.new(:x, gates)
+    # actor is not in :admin -> all group gates :ignore -> falls through to boolean (true)
+    assert Flag.enabled?(flag, for: %{id: 1, groups: [:staff]})
+  end
+
+  test "percentage_of_actors is preferred over percentage_of_time in the actor path" do
+    gates = [
+      Gate.new(:percentage_of_actors, 0.4),
+      Gate.new(:percentage_of_time, 0.999999)
+    ]
+
+    flag = Flag.new(:combo, gates)
+    actor = %{id: 42}
+    expected = Gate.score(actor, :combo) <= 0.4
+
+    # Deterministic across many calls proves the actor-based gate is used,
+    # not the (random) percentage_of_time gate.
+    results = Enum.map(1..50, fn _ -> Flag.enabled?(flag, for: actor) end)
+    assert Enum.uniq(results) == [expected]
+  end
 end
