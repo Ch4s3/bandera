@@ -38,6 +38,10 @@ if Code.ensure_loaded?(Phoenix.PubSub) do
 
     @impl GenServer
     def handle_call({:publish_change, flag_name}, _from, %{unique_id: id} = state) do
+      # Use broadcast/3 + a per-node unique_id for self-ignore (rather than
+      # broadcast_from/4) so the self-ignore mechanism is identical to the Redis
+      # adapter, which has no per-subscriber filtering. The unique_id also carries
+      # node identity across nodes.
       result = Phoenix.PubSub.broadcast(client(), @topic, {:bandera_change, flag_name, id})
       {:reply, result, state}
     end
@@ -55,6 +59,8 @@ if Code.ensure_loaded?(Phoenix.PubSub) do
       Cache.bust(flag)
       {:noreply, state}
     end
+
+    def handle_info(_msg, state), do: {:noreply, state}
 
     defp client, do: Keyword.fetch!(Config.notifications(), :client)
   end

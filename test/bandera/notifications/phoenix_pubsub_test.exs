@@ -57,13 +57,16 @@ defmodule Bandera.Notifications.PhoenixPubSubTest do
   test "our own change is ignored" do
     Cache.put(Flag.new(:f, []))
     :ok = PubSubNotifier.publish_change(:f)
-    Process.sleep(100)
+    # Sync fence: a GenServer.call ensures the notifier has processed the
+    # self-broadcast (already in its mailbox) before we assert.
+    _ = PubSubNotifier.unique_id()
     assert {:ok, _} = Cache.get(:f)
   end
 
   test "unique_id/0 returns a stable string id" do
     id = PubSubNotifier.unique_id()
     assert is_binary(id)
+    assert byte_size(id) == 16
     assert PubSubNotifier.unique_id() == id
   end
 end
