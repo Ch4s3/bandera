@@ -30,8 +30,12 @@ defmodule Bandera.Telemetry do
 
   @doc """
   Run `fun` inside a `:telemetry` span under `[:bandera | prefix]`. `fun` returns
-  `{result, extra_stop_metadata}`. The `:stop` (and `:exception`) events carry the
-  start `metadata` merged with `extra_stop_metadata`.
+  `{result, extra_stop_metadata}` and the function's `result` is returned.
+
+  The `:stop` event carries the start `metadata` merged with `extra_stop_metadata`
+  (stop fields win on key conflict). The `:exception` event carries the start
+  `metadata` with `kind`, `reason`, and `stacktrace` added by `:telemetry`
+  automatically (the function does not run to completion on a raise).
   """
   @spec span([atom], map(), (-> {result, map()})) :: result when result: var
   def span(prefix, metadata, fun)

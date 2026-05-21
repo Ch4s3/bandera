@@ -44,16 +44,17 @@ defmodule Bandera.TelemetryTest do
     assert meta.result == :my_result
   end
 
-  test "span/3 emits :exception when the function raises" do
+  test "span/3 emits :exception when the function raises, carrying start metadata" do
     attach([[:bandera, :op, :exception]])
 
     assert_raise RuntimeError, fn ->
-      Telemetry.span([:op], %{}, fn -> raise "boom" end)
+      Telemetry.span([:op], %{flag_name: :f}, fn -> raise "boom" end)
     end
 
     assert_receive {:telemetry, [:bandera, :op, :exception], meas, meta}
     assert is_integer(meas.duration)
     assert meta.kind == :error
     assert %RuntimeError{} = meta.reason
+    assert meta.flag_name == :f
   end
 end
