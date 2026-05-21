@@ -2,6 +2,8 @@ defmodule Bandera.Application do
   @moduledoc false
   use Application
 
+  require Logger
+
   @impl true
   def start(_type, _args) do
     Bandera.Config.reload()
@@ -28,10 +30,22 @@ defmodule Bandera.Application do
   end
 
   defp notification_children do
-    if Bandera.Config.notifications_enabled?() do
-      [Bandera.Config.notifications_adapter()]
-    else
-      []
+    adapter = Bandera.Config.notifications_adapter()
+
+    cond do
+      not Bandera.Config.notifications_enabled?() ->
+        []
+
+      Code.ensure_loaded?(adapter) ->
+        [adapter]
+
+      true ->
+        Logger.error(
+          "[Bandera] notifications are enabled but the adapter #{inspect(adapter)} is not " <>
+            "available. Add its dependency (e.g. :phoenix_pubsub) to your deps."
+        )
+
+        []
     end
   end
 end

@@ -35,13 +35,19 @@ if Code.ensure_loaded?(Redix.PubSub) do
       GenServer.call(__MODULE__, :unique_id)
     end
 
+    @doc "Whether the PubSub subscription has been confirmed (useful in tests)."
+    @spec subscribed?() :: boolean
+    def subscribed? do
+      GenServer.call(__MODULE__, :subscribed?)
+    end
+
     @impl GenServer
     def init(opts) do
       redis_opts = Keyword.merge(redis_config(), opts)
       {:ok, pub} = Redix.start_link(redis_opts)
       {:ok, sub} = Redix.PubSub.start_link(redis_opts)
       {:ok, _ref} = Redix.PubSub.subscribe(sub, @channel, self())
-      {:ok, %{unique_id: Config.build_unique_id(), pub: pub, sub: sub}}
+      {:ok, %{unique_id: Config.build_unique_id(), pub: pub, sub: sub, subscribed: false}}
     end
 
     @impl GenServer
@@ -54,6 +60,10 @@ if Code.ensure_loaded?(Redix.PubSub) do
       {:reply, id, state}
     end
 
+    def handle_call(:subscribed?, _from, state) do
+      {:reply, state.subscribed, state}
+    end
+
     @impl GenServer
     def handle_info(
           {:redix_pubsub, _pid, _ref, :message, %{channel: @channel, payload: payload}},
@@ -61,6 +71,10 @@ if Code.ensure_loaded?(Redix.PubSub) do
         ) do
       handle_payload(payload, state.unique_id)
       {:noreply, state}
+    end
+
+    def handle_info({:redix_pubsub, _pid, _ref, :subscribed, %{channel: @channel}}, state) do
+      {:noreply, %{state | subscribed: true}}
     end
 
     def handle_info({:redix_pubsub, _pid, _ref, _kind, _meta}, state) do

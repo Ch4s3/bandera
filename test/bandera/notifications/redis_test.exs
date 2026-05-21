@@ -19,6 +19,7 @@ defmodule Bandera.Notifications.RedisTest do
 
     Bandera.reload_config()
     start_supervised!(RedisNotifier)
+    wait_until(fn -> RedisNotifier.subscribed?() end)
 
     on_exit(fn ->
       Application.delete_env(:bandera, :cache)
