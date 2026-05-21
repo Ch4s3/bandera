@@ -31,4 +31,27 @@ defmodule Bandera.ApplicationTest do
     assert {:ok, true} = Bandera.enable(:boot_flag)
     assert Bandera.enabled?(:boot_flag)
   end
+
+  describe "persistence backend selection" do
+    setup do
+      on_exit(fn ->
+        Application.delete_env(:bandera, :persistence)
+        Bandera.reload_config()
+      end)
+
+      :ok
+    end
+
+    test "memory adapter resolves by default" do
+      Application.delete_env(:bandera, :persistence)
+      Bandera.reload_config()
+      assert Bandera.Config.persistence_adapter() == Bandera.Store.Persistent.Memory
+    end
+
+    test "redis adapter resolves when configured" do
+      Application.put_env(:bandera, :persistence, adapter: Bandera.Store.Persistent.Redis)
+      Bandera.reload_config()
+      assert Bandera.Config.persistence_adapter() == Bandera.Store.Persistent.Redis
+    end
+  end
 end

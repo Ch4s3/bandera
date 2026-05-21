@@ -40,6 +40,7 @@ defmodule Bandera.MixProject do
       # {:nimble_ownership, "~> 1.0", only: :test} to their own deps.
       {:nimble_ownership, "~> 1.0", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
+      {:redix, "~> 1.1", optional: true},
       {:ecto_sqlite3, "~> 0.17", only: :test},
       {:stream_data, "~> 1.0", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
