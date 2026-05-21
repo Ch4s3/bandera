@@ -62,18 +62,12 @@ if Code.ensure_loaded?(Redix) do
       {field, value} = Serializer.serialize(gate)
       name = to_string(flag_name)
 
-      result =
-        Redix.pipeline(@conn, [
-          ["MULTI"],
-          ["SADD", @flags_set, name],
-          ["HSET", key(flag_name), field, value],
-          ["EXEC"]
-        ])
-
-      case result do
-        {:ok, ["OK", "QUEUED", "QUEUED", [_, _]]} -> get(flag_name)
+      case Redix.transaction_pipeline(@conn, [
+             ["SADD", @flags_set, name],
+             ["HSET", key(flag_name), field, value]
+           ]) do
+        {:ok, [_, _]} -> get(flag_name)
         {:error, reason} -> {:error, reason}
-        {:ok, other} -> {:error, {:redis_pipeline_failed, other}}
       end
     end
 
@@ -89,18 +83,12 @@ if Code.ensure_loaded?(Redix) do
     def delete(flag_name) do
       name = to_string(flag_name)
 
-      result =
-        Redix.pipeline(@conn, [
-          ["MULTI"],
-          ["SREM", @flags_set, name],
-          ["DEL", key(flag_name)],
-          ["EXEC"]
-        ])
-
-      case result do
-        {:ok, ["OK", "QUEUED", "QUEUED", [_, _]]} -> {:ok, Flag.new(flag_name, [])}
+      case Redix.transaction_pipeline(@conn, [
+             ["SREM", @flags_set, name],
+             ["DEL", key(flag_name)]
+           ]) do
+        {:ok, [_, _]} -> {:ok, Flag.new(flag_name, [])}
         {:error, reason} -> {:error, reason}
-        {:ok, other} -> {:error, {:redis_pipeline_failed, other}}
       end
     end
 
@@ -115,11 +103,17 @@ if Code.ensure_loaded?(Redix) do
     @impl Bandera.Store.Persistent
     def all_flags do
       with {:ok, names} <- all_flag_names() do
-        {:ok,
-         Enum.map(names, fn name ->
-           {:ok, flag} = get(name)
-           flag
-         end)}
+        names
+        |> Enum.reduce_while({:ok, []}, fn name, {:ok, acc} ->
+          case get(name) do
+            {:ok, flag} -> {:cont, {:ok, [flag | acc]}}
+            {:error, _reason} = error -> {:halt, error}
+          end
+        end)
+        |> case do
+          {:ok, flags} -> {:ok, Enum.reverse(flags)}
+          error -> error
+        end
       end
     end
 
