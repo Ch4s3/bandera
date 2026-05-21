@@ -1,5 +1,6 @@
 defmodule Bandera.MixProject do
   use Mix.Project
+  @source_url "https://github.com/ch4s3/bandera"
 
   def project do
     [
@@ -10,7 +11,7 @@ defmodule Bandera.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: "Feature flag library with runtime config for storage backends and caching.",
-      links: [],
+      package: package(),
       test_coverage: [summary: [threshold: 85]],
       # Incremental Dialyzer via `mix assay`:
       assay: [
@@ -30,6 +31,19 @@ defmodule Bandera.MixProject do
     [
       extra_applications: [:logger, :crypto],
       mod: {Bandera.Application, []}
+    ]
+  end
+
+  defp package do
+    [
+      maintainers: ["Chase Gilliam"],
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => @source_url
+      },
+      files:
+        ~w(.formatter.exs mix.exs README.md CHANGELOG.md lib) ++
+          ~w(integration_test/cases integration_test/support)
     ]
   end
 
