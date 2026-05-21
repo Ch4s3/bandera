@@ -3,6 +3,9 @@ defmodule Bandera.Store.Cache do
   ETS read cache for flags. Always started; bypassed by the store when the cache
   is disabled (so the cache can be toggled at runtime without races). The TTL is
   read from the runtime `Bandera.Config` snapshot at lookup time.
+
+  Note: a TTL of `0` causes every entry to expire immediately on the next read
+  (it is not "no expiry"). To disable caching entirely, set `cache: [enabled: false]`.
   """
 
   use GenServer
