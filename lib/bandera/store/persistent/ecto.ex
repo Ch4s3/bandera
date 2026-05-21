@@ -2,8 +2,10 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
   defmodule Bandera.Store.Persistent.Ecto do
     @moduledoc """
     SQL persistence adapter. The repo and table name are read from
-    `Bandera.Config` at RUNTIME and queries are schemaless, so nothing about the
-    table is fixed at compile time.
+    `Bandera.Config` at RUNTIME and queries bind the table via Ecto's
+    `{table_name, Record}` source form, so nothing about the table is fixed at
+    compile time. The `Record` schema supplies field types so values (e.g.
+    booleans) cast portably across SQL backends.
 
     Configure:
 
@@ -24,37 +26,30 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     alias Bandera.Config
     alias Bandera.Flag
     alias Bandera.Gate
+    alias Bandera.Store.Persistent.Ecto.Record
     alias Bandera.Store.Persistent.Ecto.Serializer
 
     @impl Bandera.Store.Persistent
     def get(flag_name) do
       name = to_string(flag_name)
-
-      rows =
-        from(t in table(),
-          where: t.flag_name == ^name,
-          select: %{
-            gate_type: t.gate_type,
-            target: t.target,
-            enabled: type(t.enabled, :boolean)
-          }
-        )
-        |> repo().all()
-
-      {:ok, Serializer.deserialize_flag(flag_name, rows)}
+      records = repo().all(from(r in {table(), Record}, where: r.flag_name == ^name))
+      {:ok, Serializer.deserialize_flag(flag_name, records)}
     end
 
     @impl Bandera.Store.Persistent
     def put(flag_name, %Gate{type: type} = gate)
         when type in [:percentage_of_time, :percentage_of_actors] do
       name = to_string(flag_name)
-      row = dump_row(Serializer.to_row(flag_name, gate))
+      row = Serializer.to_row(flag_name, gate)
 
       repo().transaction(fn ->
-        from(t in table(), where: t.flag_name == ^name and t.gate_type == "percentage")
-        |> repo().delete_all()
+        repo().delete_all(
+          from(r in {table(), Record},
+            where: r.flag_name == ^name and r.gate_type == "percentage"
+          )
+        )
 
-        repo().insert_all(table(), [row])
+        repo().insert_all({table(), Record}, [row])
       end)
 
       get(flag_name)
@@ -62,10 +57,10 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
     @impl Bandera.Store.Persistent
     def put(flag_name, %Gate{} = gate) do
-      row = dump_row(Serializer.to_row(flag_name, gate))
+      row = Serializer.to_row(flag_name, gate)
 
-      repo().insert_all(table(), [row],
-        on_conflict: [set: [enabled: dump_boolean(gate.enabled)]],
+      repo().insert_all({table(), Record}, [row],
+        on_conflict: {:replace, [:enabled]},
         conflict_target: [:flag_name, :gate_type, :target]
       )
 
@@ -77,8 +72,9 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
         when type in [:percentage_of_time, :percentage_of_actors] do
       name = to_string(flag_name)
 
-      from(t in table(), where: t.flag_name == ^name and t.gate_type == "percentage")
-      |> repo().delete_all()
+      repo().delete_all(
+        from(r in {table(), Record}, where: r.flag_name == ^name and r.gate_type == "percentage")
+      )
 
       get(flag_name)
     end
@@ -89,10 +85,11 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       gate_type = to_string(gate.type)
       target = Serializer.serialize_target(gate.for)
 
-      from(t in table(),
-        where: t.flag_name == ^name and t.gate_type == ^gate_type and t.target == ^target
+      repo().delete_all(
+        from(r in {table(), Record},
+          where: r.flag_name == ^name and r.gate_type == ^gate_type and r.target == ^target
+        )
       )
-      |> repo().delete_all()
 
       get(flag_name)
     end
@@ -100,27 +97,17 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     @impl Bandera.Store.Persistent
     def delete(flag_name) do
       name = to_string(flag_name)
-
-      from(t in table(), where: t.flag_name == ^name)
-      |> repo().delete_all()
-
+      repo().delete_all(from(r in {table(), Record}, where: r.flag_name == ^name))
       {:ok, Flag.new(flag_name, [])}
     end
 
     @impl Bandera.Store.Persistent
     def all_flags do
       flags =
-        from(t in table(),
-          select: %{
-            flag_name: t.flag_name,
-            gate_type: t.gate_type,
-            target: t.target,
-            enabled: type(t.enabled, :boolean)
-          }
-        )
+        from(r in {table(), Record})
         |> repo().all()
         |> Enum.group_by(& &1.flag_name)
-        |> Enum.map(fn {name, rows} -> Serializer.deserialize_flag(name, rows) end)
+        |> Enum.map(fn {name, records} -> Serializer.deserialize_flag(name, records) end)
 
       {:ok, flags}
     end
@@ -128,7 +115,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     @impl Bandera.Store.Persistent
     def all_flag_names do
       names =
-        from(t in table(), select: t.flag_name, distinct: true)
+        from(r in {table(), Record}, select: r.flag_name, distinct: true)
         |> repo().all()
         |> Enum.map(&String.to_atom/1)
 
@@ -137,14 +124,5 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
     defp repo, do: Keyword.fetch!(Config.persistence(), :repo)
     defp table, do: Config.ecto_table_name()
-
-    # Schemaless `insert_all` carries no field types, so the adapter cannot rely on
-    # the Ecto type to dump booleans for the underlying database. We dump the only
-    # typed column (`enabled`) here and cast it back with `type(t.enabled, :boolean)`
-    # on read, keeping a portable 1/0 representation on disk.
-    defp dump_row(%{enabled: enabled} = row), do: %{row | enabled: dump_boolean(enabled)}
-
-    defp dump_boolean(true), do: 1
-    defp dump_boolean(false), do: 0
   end
 end
