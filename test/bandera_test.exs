@@ -116,4 +116,108 @@ defmodule BanderaTest do
     assert Bandera.enabled?(:f, for: nil) == Bandera.enabled?(:f)
     assert Bandera.enabled?(:f, for: nil)
   end
+
+  test "enable(flag, for_actor: nil) behaves like a flag-wide enable" do
+    assert {:ok, true} = Bandera.enable(:f, for_actor: nil)
+    assert Bandera.enabled?(:f)
+    assert Bandera.enabled?(:f, for: %{id: 7})
+  end
+
+  test "enable(flag, for_group: nil) behaves like a flag-wide enable" do
+    assert {:ok, true} = Bandera.enable(:f, for_group: nil)
+    assert Bandera.enabled?(:f)
+    assert Bandera.enabled?(:f, for: %{id: 7, groups: [:anything]})
+  end
+
+  test "disable(flag, for_actor: actor) disables only that actor" do
+    {:ok, _} = Bandera.enable(:f)
+    assert {:ok, false} = Bandera.disable(:f, for_actor: %{id: 1})
+    refute Bandera.enabled?(:f, for: %{id: 1})
+    # other actors still follow the flag-wide boolean (true)
+    assert Bandera.enabled?(:f, for: %{id: 2})
+  end
+
+  test "disable(flag, for_group: name) disables only that group" do
+    {:ok, _} = Bandera.enable(:f)
+    assert {:ok, false} = Bandera.disable(:f, for_group: :admin)
+    refute Bandera.enabled?(:f, for: %{id: 1, groups: [:admin]})
+    assert Bandera.enabled?(:f, for: %{id: 2, groups: [:staff]})
+  end
+
+  test "disable(flag, for_actor: nil) behaves like a flag-wide disable" do
+    {:ok, _} = Bandera.enable(:f)
+    assert Bandera.enabled?(:f)
+    assert {:ok, false} = Bandera.disable(:f, for_actor: nil)
+    refute Bandera.enabled?(:f)
+  end
+
+  test "disable(flag, for_group: nil) behaves like a flag-wide disable" do
+    {:ok, _} = Bandera.enable(:f)
+    assert Bandera.enabled?(:f)
+    assert {:ok, false} = Bandera.disable(:f, for_group: nil)
+    refute Bandera.enabled?(:f)
+  end
+
+  test "clear(flag, for_group: name) removes only that group gate" do
+    {:ok, _} = Bandera.enable(:f)
+    {:ok, _} = Bandera.disable(:f, for_group: :admin)
+    refute Bandera.enabled?(:f, for: %{id: 1, groups: [:admin]})
+
+    assert :ok = Bandera.clear(:f, for_group: :admin)
+    # group gate gone, boolean (true) remains -> admins now enabled again
+    assert Bandera.enabled?(:f, for: %{id: 1, groups: [:admin]})
+    assert Bandera.enabled?(:f)
+  end
+
+  test "clear(flag, for_actor: nil) clears the whole flag" do
+    {:ok, _} = Bandera.enable(:f)
+    assert Bandera.enabled?(:f)
+    assert :ok = Bandera.clear(:f, for_actor: nil)
+    refute Bandera.enabled?(:f)
+    assert {:ok, %Bandera.Flag{name: :f, gates: []}} = Bandera.get_flag(:f)
+  end
+
+  test "clear(flag, for_group: nil) clears the whole flag" do
+    {:ok, _} = Bandera.enable(:f)
+    assert Bandera.enabled?(:f)
+    assert :ok = Bandera.clear(:f, for_group: nil)
+    refute Bandera.enabled?(:f)
+    assert {:ok, %Bandera.Flag{name: :f, gates: []}} = Bandera.get_flag(:f)
+  end
+
+  describe "store errors propagate (FailingStore)" do
+    setup do
+      Application.put_env(:bandera, :store, Bandera.FailingStore)
+      Bandera.reload_config()
+      :ok
+    end
+
+    test "enabled? logs and returns false when the store lookup fails" do
+      import ExUnit.CaptureLog
+
+      assert capture_log(fn -> refute Bandera.enabled?(:f) end) =~ "store lookup"
+      assert capture_log(fn -> refute Bandera.enabled?(:f, for: %{id: 1}) end) =~ "store lookup"
+    end
+
+    test "enable/disable return the store error" do
+      assert {:error, :boom} = Bandera.enable(:f)
+      assert {:error, :boom} = Bandera.enable(:f, for_actor: %{id: 1})
+      assert {:error, :boom} = Bandera.enable(:f, for_group: :admin)
+      assert {:error, :boom} = Bandera.disable(:f)
+    end
+
+    test "clear returns the store error" do
+      assert {:error, :boom} = Bandera.clear(:f)
+      assert {:error, :boom} = Bandera.clear(:f, for_actor: %{id: 1})
+    end
+
+    test "disable for_percentage_of returns the store error from the underlying enable" do
+      assert {:error, :boom} = Bandera.disable(:f, for_percentage_of: {:actors, 0.5})
+    end
+
+    test "all_flags and all_flag_names return the store error" do
+      assert {:error, :boom} = Bandera.all_flags()
+      assert {:error, :boom} = Bandera.all_flag_names()
+    end
+  end
 end

@@ -91,4 +91,11 @@ defmodule Bandera.Store.Persistent.RedisTest do
     assert {:ok, true} = Bandera.enable(:api_flag)
     assert Bandera.enabled?(:api_flag)
   end
+
+  test "child_spec/1 returns a supervisable spec" do
+    assert %{
+             id: Bandera.Store.Persistent.Redis,
+             start: {Bandera.Store.Persistent.Redis, :start_link, [_]}
+           } = RedisStore.child_spec([])
+  end
 end

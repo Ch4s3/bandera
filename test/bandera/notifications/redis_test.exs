@@ -66,4 +66,11 @@ defmodule Bandera.Notifications.RedisTest do
     assert is_binary(id)
     assert RedisNotifier.unique_id() == id
   end
+
+  test "child_spec/1 returns a supervisable spec" do
+    assert %{
+             id: Bandera.Notifications.Redis,
+             start: {Bandera.Notifications.Redis, :start_link, [_]}
+           } = Bandera.Notifications.Redis.child_spec([])
+  end
 end
