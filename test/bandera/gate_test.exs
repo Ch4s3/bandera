@@ -42,4 +42,22 @@ defmodule Bandera.GateTest do
     assert Gate.id(Gate.new(:actor, %{id: 9}, true)) == "actor/9"
     assert Gate.id(Gate.new(:group, :admin, true)) == "group/admin"
   end
+
+  test "actor gate still matches when extra opts (e.g. flag_name) are present" do
+    gate = Gate.new(:actor, %{id: 99}, true)
+    assert Gate.enabled?(gate, for: %{id: 99}, flag_name: :f) == {:ok, true}
+  end
+
+  test "percentage_of_actors gate uses score to decide eligibility" do
+    gate = Gate.new(:percentage_of_actors, 0.5)
+    actor = %{id: 7}
+    expected = Gate.score(actor, :some_flag) <= 0.5
+    assert Gate.enabled?(gate, for: actor, flag_name: :some_flag) == {:ok, expected}
+  end
+
+  test "percentage_of_time gate returns an {:ok, boolean}" do
+    gate = Gate.new(:percentage_of_time, 0.5)
+    assert {:ok, value} = Gate.enabled?(gate)
+    assert is_boolean(value)
+  end
 end

@@ -76,20 +76,19 @@ defmodule Bandera.Gate do
     {:ok, enabled}
   end
 
-  def enabled?(%__MODULE__{type: :actor, for: actor_id, enabled: enabled}, for: actor) do
-    case Actor.id(actor) do
-      ^actor_id -> {:ok, enabled}
-      _ -> :ignore
+  def enabled?(%__MODULE__{type: :actor, for: actor_id, enabled: enabled}, options) do
+    case Keyword.fetch(options, :for) do
+      {:ok, actor} -> if Actor.id(actor) == actor_id, do: {:ok, enabled}, else: :ignore
+      :error -> :ignore
     end
   end
 
-  def enabled?(%__MODULE__{type: :actor}, _options), do: :ignore
-
-  def enabled?(%__MODULE__{type: :group, for: group, enabled: enabled}, for: item) do
-    if Group.in?(item, group), do: {:ok, enabled}, else: :ignore
+  def enabled?(%__MODULE__{type: :group, for: group, enabled: enabled}, options) do
+    case Keyword.fetch(options, :for) do
+      {:ok, item} -> if Group.in?(item, group), do: {:ok, enabled}, else: :ignore
+      :error -> :ignore
+    end
   end
-
-  def enabled?(%__MODULE__{type: :group}, _options), do: :ignore
 
   def enabled?(%__MODULE__{type: :percentage_of_time, for: ratio}, _options) do
     {:ok, :rand.uniform(10_000) / 10_000 <= ratio}
