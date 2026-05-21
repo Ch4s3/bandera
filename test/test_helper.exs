@@ -16,9 +16,36 @@ Ecto.Migrator.run(Bandera.TestRepo, [{20_260_101_000_000, Bandera.TestRepo.Migra
   log: false
 )
 
-# --- Redis: start a named connection if a local Redis is reachable, else skip :redis tests ---
-case Bandera.Store.Persistent.Redis.start_link(sync_connect: true) do
-  {:ok, _conn} -> :ok
-  {:error, {:already_started, _pid}} -> :ok
-  {:error, _reason} -> ExUnit.configure(exclude: [:redis])
+# --- Redis: run the :redis tests only if a local Redis is reachable. ---
+# Redix links its connection to this process and, with sync_connect, a refused
+# connection crashes that linked process; trap exits so an unreachable Redis
+# excludes the :redis tests instead of taking down the test boot.
+Process.flag(:trap_exit, true)
+
+reachable? = fn conn ->
+  try do
+    match?({:ok, "PONG"}, Redix.command(conn, ["PING"]))
+  catch
+    :exit, _ -> false
+  rescue
+    _ -> false
+  end
+end
+
+redis_available? =
+  case Bandera.Store.Persistent.Redis.start_link(sync_connect: true) do
+    {:ok, conn} -> reachable?.(conn)
+    {:error, {:already_started, conn}} -> reachable?.(conn)
+    {:error, _reason} -> false
+  end
+
+# Drop any EXIT message from a crashed (unreachable) connection so it doesn't leak.
+receive do
+  {:EXIT, _pid, _reason} -> :ok
+after
+  0 -> :ok
+end
+
+unless redis_available? do
+  ExUnit.configure(exclude: [:redis])
 end
