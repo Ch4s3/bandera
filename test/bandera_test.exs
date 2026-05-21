@@ -82,6 +82,10 @@ defmodule BanderaTest do
     assert {:ok, %Bandera.Flag{name: :a}} = Bandera.get_flag(:a)
   end
 
+  test "get_flag returns an empty flag (not an error) for an unknown name" do
+    assert {:ok, %Bandera.Flag{name: :never_set, gates: []}} = Bandera.get_flag(:never_set)
+  end
+
   test "enable for_percentage_of {:time, ratio} stores a percentage_of_time gate" do
     assert {:ok, true} = Bandera.enable(:f, for_percentage_of: {:time, 0.5})
 

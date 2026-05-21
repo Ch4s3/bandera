@@ -11,7 +11,7 @@ defmodule NoCompileEnvTest do
     offenders =
       "lib/**/*.ex"
       |> Path.wildcard()
-      |> Enum.filter(fn path -> File.read!(path) =~ ~r/Application\.compile_env[\s(]/ end)
+      |> Enum.filter(fn path -> File.read!(path) =~ ~r/Application\.compile_env[!\s(]/ end)
 
     assert offenders == [],
            "Application.compile_env must not be used in Bandera. Offending files: #{inspect(offenders)}"
