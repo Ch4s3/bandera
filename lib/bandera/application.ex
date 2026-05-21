@@ -8,7 +8,7 @@ defmodule Bandera.Application do
 
     children =
       if Application.get_env(:bandera, :start_on_boot, true) do
-        [Bandera.Store.Cache | persistence_children()]
+        [Bandera.Store.Cache | persistence_children()] ++ notification_children()
       else
         []
       end
@@ -24,6 +24,14 @@ defmodule Bandera.Application do
       Bandera.Store.Persistent.Memory -> [Bandera.Store.Persistent.Memory]
       Bandera.Store.Persistent.Redis -> [Bandera.Store.Persistent.Redis]
       _other -> []
+    end
+  end
+
+  defp notification_children do
+    if Bandera.Config.notifications_enabled?() do
+      [Bandera.Config.notifications_adapter()]
+    else
+      []
     end
   end
 end

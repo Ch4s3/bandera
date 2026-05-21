@@ -54,4 +54,32 @@ defmodule Bandera.ApplicationTest do
       assert Bandera.Config.persistence_adapter() == Bandera.Store.Persistent.Redis
     end
   end
+
+  describe "notifications selection" do
+    setup do
+      on_exit(fn ->
+        Application.delete_env(:bandera, :cache_bust_notifications)
+        Bandera.reload_config()
+      end)
+
+      :ok
+    end
+
+    test "disabled by default" do
+      Application.delete_env(:bandera, :cache_bust_notifications)
+      Bandera.reload_config()
+      assert Bandera.Config.notifications_enabled?() == false
+    end
+
+    test "resolves the configured adapter when enabled" do
+      Application.put_env(:bandera, :cache_bust_notifications,
+        enabled: true,
+        adapter: Bandera.Notifications.PhoenixPubSub
+      )
+
+      Bandera.reload_config()
+      assert Bandera.Config.notifications_enabled?() == true
+      assert Bandera.Config.notifications_adapter() == Bandera.Notifications.PhoenixPubSub
+    end
+  end
 end
