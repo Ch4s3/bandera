@@ -68,4 +68,10 @@ defmodule Bandera.Store.ProcessScopedTest do
     send(pid, :go)
     assert_receive {:result, {:ok, %Flag{name: :allowed, gates: [%Gate{enabled: true}]}}}
   end
+
+  test "both percentage gate types share one slot (parity with Memory)" do
+    {:ok, _} = ProcessScoped.put(:pct, Gate.new(:percentage_of_time, 0.3))
+    {:ok, flag} = ProcessScoped.put(:pct, Gate.new(:percentage_of_actors, 0.7))
+    assert [%Gate{type: :percentage_of_actors, for: 0.7}] = flag.gates
+  end
 end

@@ -56,4 +56,13 @@ defmodule Bandera.TestTest do
     spawn(fn -> send(parent, {:enabled?, Bandera.enabled?(:scoped)}) end)
     assert_receive {:enabled?, false}
   end
+
+  test "clear/1 removes a single flag's overrides, leaving others intact" do
+    enable_flag(:keep)
+    enable_flag(:drop_me)
+
+    assert :ok = Bandera.Test.clear(:drop_me)
+    refute Bandera.enabled?(:drop_me)
+    assert Bandera.enabled?(:keep)
+  end
 end
