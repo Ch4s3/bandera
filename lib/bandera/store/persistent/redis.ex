@@ -62,11 +62,14 @@ if Code.ensure_loaded?(Redix) do
       {field, value} = Serializer.serialize(gate)
       name = to_string(flag_name)
 
-      case Redix.transaction_pipeline(@conn, [
-             ["SADD", @flags_set, name],
-             ["HSET", key(flag_name), field, value]
-           ]) do
-        {:ok, [_, _]} -> get(flag_name)
+      pipeline =
+        Redix.transaction_pipeline(@conn, [
+          ["SADD", @flags_set, name],
+          ["HSET", key(flag_name), field, value]
+        ])
+
+      case check_pipeline(pipeline) do
+        :ok -> get(flag_name)
         {:error, reason} -> {:error, reason}
       end
     end
@@ -83,11 +86,14 @@ if Code.ensure_loaded?(Redix) do
     def delete(flag_name) do
       name = to_string(flag_name)
 
-      case Redix.transaction_pipeline(@conn, [
-             ["SREM", @flags_set, name],
-             ["DEL", key(flag_name)]
-           ]) do
-        {:ok, [_, _]} -> {:ok, Flag.new(flag_name, [])}
+      pipeline =
+        Redix.transaction_pipeline(@conn, [
+          ["SREM", @flags_set, name],
+          ["DEL", key(flag_name)]
+        ])
+
+      case check_pipeline(pipeline) do
+        :ok -> {:ok, Flag.new(flag_name, [])}
         {:error, reason} -> {:error, reason}
       end
     end
@@ -118,5 +124,16 @@ if Code.ensure_loaded?(Redix) do
     end
 
     defp key(flag_name), do: @prefix <> to_string(flag_name)
+
+    # transaction_pipeline returns {:ok, results} even if a command inside the
+    # transaction errored — each element can be a %Redix.Error{}. Surface those.
+    defp check_pipeline({:ok, results}) do
+      case Enum.find(results, &match?(%Redix.Error{}, &1)) do
+        nil -> :ok
+        %Redix.Error{} = error -> {:error, error}
+      end
+    end
+
+    defp check_pipeline({:error, reason}), do: {:error, reason}
   end
 end
