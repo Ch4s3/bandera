@@ -28,7 +28,7 @@ if Code.ensure_loaded?(Ecto.Migration) do
 
       create_if_not_exists(
         unique_index(table_name, [:flag_name, :gate_type, :target],
-          name: :bandera_flag_name_gate_target_idx
+          name: :"#{table_name}_flag_name_gate_target_idx"
         )
       )
 

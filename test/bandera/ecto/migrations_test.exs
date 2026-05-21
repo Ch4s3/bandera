@@ -11,9 +11,9 @@ defmodule Bandera.Ecto.MigrationsTest do
   test "the unique index exists" do
     %{rows: rows} =
       Bandera.TestRepo.query!(
-        "SELECT name FROM sqlite_master WHERE type='index' AND name='bandera_flag_name_gate_target_idx'"
+        "SELECT name FROM sqlite_master WHERE type='index' AND name='bandera_flags_flag_name_gate_target_idx'"
       )
 
-    assert rows == [["bandera_flag_name_gate_target_idx"]]
+    assert rows == [["bandera_flags_flag_name_gate_target_idx"]]
   end
 end

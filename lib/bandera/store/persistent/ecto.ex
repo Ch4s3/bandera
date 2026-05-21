@@ -27,6 +27,13 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     `{:error, _}` (safe to retry); a rare interleaving of two different-ratio writes
     could momentarily leave two percentage rows. A future version may add advisory
     locking (as fun_with_flags does) if needed.
+
+    ## Errors
+
+    Unexpected database failures propagate as exceptions (let it crash — your repo's
+    supervision tree handles recovery), consistent with the other persistence
+    adapters. The percentage `put/2` additionally returns `{:error, reason}` when its
+    transaction is rolled back.
     """
 
     @behaviour Bandera.Store.Persistent
