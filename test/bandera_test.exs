@@ -81,4 +81,35 @@ defmodule BanderaTest do
     {:ok, _} = Bandera.enable(:a)
     assert {:ok, %Bandera.Flag{name: :a}} = Bandera.get_flag(:a)
   end
+
+  test "enable for_percentage_of {:time, ratio} stores a percentage_of_time gate" do
+    assert {:ok, true} = Bandera.enable(:f, for_percentage_of: {:time, 0.5})
+
+    assert {:ok, %Bandera.Flag{gates: [%Bandera.Gate{type: :percentage_of_time, for: 0.5}]}} =
+             Bandera.get_flag(:f)
+  end
+
+  test "clear(boolean: true) removes only the boolean gate" do
+    {:ok, _} = Bandera.enable(:f)
+    {:ok, _} = Bandera.enable(:f, for_actor: %{id: 1})
+
+    assert :ok = Bandera.clear(:f, boolean: true)
+    # boolean gate gone, actor gate remains
+    assert Bandera.enabled?(:f, for: %{id: 1})
+    refute Bandera.enabled?(:f)
+  end
+
+  test "clear(for_percentage: true) clears a percentage_of_actors gate (shared slot)" do
+    {:ok, _} = Bandera.enable(:f, for_percentage_of: {:actors, 0.999999})
+    assert Bandera.enabled?(:f, for: %{id: 1})
+
+    assert :ok = Bandera.clear(:f, for_percentage: true)
+    refute Bandera.enabled?(:f, for: %{id: 1})
+  end
+
+  test "enabled?(flag, for: nil) behaves like enabled?(flag)" do
+    {:ok, _} = Bandera.enable(:f)
+    assert Bandera.enabled?(:f, for: nil) == Bandera.enabled?(:f)
+    assert Bandera.enabled?(:f, for: nil)
+  end
 end

@@ -9,6 +9,7 @@ defmodule Bandera do
   alias Bandera.Flag
   alias Bandera.Gate
   alias Bandera.Store
+  require Logger
 
   @doc "Re-read application env into the runtime config snapshot."
   @spec reload_config() :: :ok
@@ -22,7 +23,7 @@ defmodule Bandera do
   def enabled?(flag_name, []) when is_atom(flag_name) do
     case Store.active().lookup(flag_name) do
       {:ok, flag} -> Flag.enabled?(flag)
-      _error -> false
+      error -> lookup_failed(flag_name, error)
     end
   end
 
@@ -31,7 +32,7 @@ defmodule Bandera do
   def enabled?(flag_name, for: item) when is_atom(flag_name) do
     case Store.active().lookup(flag_name) do
       {:ok, flag} -> Flag.enabled?(flag, for: item)
-      _error -> false
+      error -> lookup_failed(flag_name, error)
     end
   end
 
@@ -145,5 +146,10 @@ defmodule Bandera do
       {:ok, _flag} -> :ok
       error -> error
     end
+  end
+
+  defp lookup_failed(flag_name, error) do
+    Logger.warning("[Bandera] store lookup for #{inspect(flag_name)} failed: #{inspect(error)}")
+    false
   end
 end
