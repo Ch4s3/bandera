@@ -41,9 +41,7 @@ defmodule Bandera.MixProject do
       links: %{
         "GitHub" => @source_url
       },
-      files:
-        ~w(.formatter.exs mix.exs README.md CHANGELOG.md lib) ++
-          ~w(integration_test/cases integration_test/support)
+      files: ~w(.formatter.exs mix.exs README.md lib)
     ]
   end
 
