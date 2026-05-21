@@ -15,3 +15,9 @@ Ecto.Migrator.run(Bandera.TestRepo, [{20_260_101_000_000, Bandera.TestRepo.Migra
   all: true,
   log: false
 )
+
+# --- Redis: start a named connection if a local Redis is reachable, else skip :redis tests ---
+case Bandera.Store.Persistent.Redis.start_link(sync_connect: true) do
+  {:ok, _conn} -> :ok
+  {:error, _reason} -> ExUnit.configure(exclude: [:redis])
+end
