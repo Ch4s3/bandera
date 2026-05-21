@@ -17,7 +17,10 @@ defmodule Bandera.Notifications do
 
   require Logger
 
+  @doc "Broadcasts a flag change to other nodes so they bust their local cache entry."
   @callback publish_change(flag_name :: atom) :: :ok | {:error, term}
+
+  @doc "Returns this node's stable per-node id, used to ignore self-published changes."
   @callback unique_id() :: String.t()
 
   @doc "Publish a flag change to other nodes (no-op when notifications are disabled, best-effort when enabled)."

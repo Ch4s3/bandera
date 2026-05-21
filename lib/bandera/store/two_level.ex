@@ -4,6 +4,14 @@ defmodule Bandera.Store.TwoLevel do
   is consulted is decided per-call from the runtime `Bandera.Config` snapshot
   (read from `:persistent_term`), so caching can be toggled at runtime with no
   recompilation. The persistent adapter is also runtime-selected.
+
+  ## Examples
+
+      iex> alias Bandera.Store.TwoLevel
+      iex> TwoLevel.put(:demo, Bandera.Gate.new(:boolean, true))
+      iex> {:ok, flag} = TwoLevel.lookup(:demo)
+      iex> flag.gates
+      [%Bandera.Gate{type: :boolean, for: nil, enabled: true}]
   """
 
   @behaviour Bandera.Store

@@ -13,9 +13,31 @@ defmodule Bandera.Gate do
         }
 
   defmodule InvalidTargetError do
+    @moduledoc "Raised when a percentage gate is built with a ratio outside `0.0 < r < 1.0`."
     defexception [:message]
   end
 
+  @doc """
+  Builds a gate of the given `type`.
+
+  The two-argument form covers `:boolean` gates (with a boolean value) and the two
+  percentage gate types (`:percentage_of_time` / `:percentage_of_actors`, with a
+  ratio strictly between `0.0` and `1.0`). The three-argument form (see below)
+  covers `:actor` and `:group` gates.
+
+  Raises `Bandera.Gate.InvalidTargetError` when a percentage ratio is out of range.
+
+  ## Examples
+
+      iex> Bandera.Gate.new(:boolean, true)
+      %Bandera.Gate{type: :boolean, for: nil, enabled: true}
+
+      iex> Bandera.Gate.new(:percentage_of_actors, 0.25)
+      %Bandera.Gate{type: :percentage_of_actors, for: 0.25, enabled: true}
+
+      iex> Bandera.Gate.new(:percentage_of_time, 1.5)
+      ** (Bandera.Gate.InvalidTargetError) percentage_of_time gates require a ratio in the range 0.0 < r < 1.0
+  """
   @spec new(:boolean, boolean) :: t
   def new(:boolean, enabled) when is_boolean(enabled) do
     %__MODULE__{type: :boolean, for: nil, enabled: enabled}
@@ -32,6 +54,20 @@ defmodule Bandera.Gate do
     raise InvalidTargetError, "#{type} gates require a ratio in the range 0.0 < r < 1.0"
   end
 
+  @doc """
+  Builds an `:actor` or `:group` gate targeting `for` with the boolean `enabled`.
+
+  Actor targets are normalised to a string id via the `Bandera.Actor` protocol;
+  group names are stringified.
+
+  ## Examples
+
+      iex> Bandera.Gate.new(:actor, "user-1", true)
+      %Bandera.Gate{type: :actor, for: "user-1", enabled: true}
+
+      iex> Bandera.Gate.new(:group, :beta, false)
+      %Bandera.Gate{type: :group, for: "beta", enabled: false}
+  """
   @spec new(:actor, term, boolean) :: t
   def new(:actor, actor, enabled) when is_boolean(enabled) do
     %__MODULE__{type: :actor, for: Actor.id(actor), enabled: enabled}
@@ -42,26 +78,98 @@ defmodule Bandera.Gate do
     %__MODULE__{type: :group, for: to_string(group_name), enabled: enabled}
   end
 
+  @doc """
+  Returns `true` if the gate is a `:boolean` gate.
+
+  ## Examples
+
+      iex> Bandera.Gate.boolean?(Bandera.Gate.new(:boolean, true))
+      true
+
+      iex> Bandera.Gate.boolean?(Bandera.Gate.new(:actor, "u1", true))
+      false
+  """
   @spec boolean?(t) :: boolean
   def boolean?(%__MODULE__{type: :boolean}), do: true
   def boolean?(%__MODULE__{}), do: false
 
+  @doc """
+  Returns `true` if the gate is an `:actor` gate.
+
+  ## Examples
+
+      iex> Bandera.Gate.actor?(Bandera.Gate.new(:actor, "u1", true))
+      true
+
+      iex> Bandera.Gate.actor?(Bandera.Gate.new(:boolean, true))
+      false
+  """
   @spec actor?(t) :: boolean
   def actor?(%__MODULE__{type: :actor}), do: true
   def actor?(%__MODULE__{}), do: false
 
+  @doc """
+  Returns `true` if the gate is a `:group` gate.
+
+  ## Examples
+
+      iex> Bandera.Gate.group?(Bandera.Gate.new(:group, :beta, true))
+      true
+
+      iex> Bandera.Gate.group?(Bandera.Gate.new(:boolean, true))
+      false
+  """
   @spec group?(t) :: boolean
   def group?(%__MODULE__{type: :group}), do: true
   def group?(%__MODULE__{}), do: false
 
+  @doc """
+  Returns `true` if the gate is a `:percentage_of_time` gate.
+
+  ## Examples
+
+      iex> Bandera.Gate.percentage_of_time?(Bandera.Gate.new(:percentage_of_time, 0.5))
+      true
+
+      iex> Bandera.Gate.percentage_of_time?(Bandera.Gate.new(:percentage_of_actors, 0.5))
+      false
+  """
   @spec percentage_of_time?(t) :: boolean
   def percentage_of_time?(%__MODULE__{type: :percentage_of_time}), do: true
   def percentage_of_time?(%__MODULE__{}), do: false
 
+  @doc """
+  Returns `true` if the gate is a `:percentage_of_actors` gate.
+
+  ## Examples
+
+      iex> Bandera.Gate.percentage_of_actors?(Bandera.Gate.new(:percentage_of_actors, 0.5))
+      true
+
+      iex> Bandera.Gate.percentage_of_actors?(Bandera.Gate.new(:percentage_of_time, 0.5))
+      false
+  """
   @spec percentage_of_actors?(t) :: boolean
   def percentage_of_actors?(%__MODULE__{type: :percentage_of_actors}), do: true
   def percentage_of_actors?(%__MODULE__{}), do: false
 
+  @doc """
+  Returns the gate's storage id, used as the per-flag slot key.
+
+  Both percentage gate types collapse to `"percentage"` (a flag holds at most one
+  percentage gate), while actor and group ids embed their target.
+
+  ## Examples
+
+      iex> Bandera.Gate.id(Bandera.Gate.new(:boolean, true))
+      "boolean"
+
+      iex> Bandera.Gate.id(Bandera.Gate.new(:actor, "u1", true))
+      "actor/u1"
+
+      iex> Bandera.Gate.id(Bandera.Gate.new(:percentage_of_actors, 0.25))
+      "percentage"
+  """
   @spec id(t) :: String.t()
   def id(%__MODULE__{type: :boolean}), do: "boolean"
   def id(%__MODULE__{type: :actor, for: actor_id}), do: "actor/#{actor_id}"
@@ -69,6 +177,26 @@ defmodule Bandera.Gate do
   def id(%__MODULE__{type: :percentage_of_time}), do: "percentage"
   def id(%__MODULE__{type: :percentage_of_actors}), do: "percentage"
 
+  @doc """
+  Evaluates a single gate against `options`.
+
+  Returns `{:ok, boolean}` when this gate decides the outcome, or `:ignore` when it
+  does not apply to the given input (so `Bandera.Flag` can fall through to the next
+  gate). Boolean and percentage-of-time gates always decide; actor and group gates
+  return `:ignore` unless `options[:for]` matches their target; percentage-of-actors
+  gates require both `:for` and `:flag_name`.
+
+  ## Examples
+
+      iex> Bandera.Gate.enabled?(Bandera.Gate.new(:boolean, true))
+      {:ok, true}
+
+      iex> Bandera.Gate.enabled?(Bandera.Gate.new(:actor, "u1", true), for: "u1")
+      {:ok, true}
+
+      iex> Bandera.Gate.enabled?(Bandera.Gate.new(:actor, "u1", true), for: "u2")
+      :ignore
+  """
   @spec enabled?(t, keyword) :: {:ok, boolean} | :ignore
   def enabled?(gate, options \\ [])
 
@@ -100,7 +228,22 @@ defmodule Bandera.Gate do
     {:ok, score(actor, flag_name) <= ratio}
   end
 
-  @doc "Deterministic score in [0.0, 1.0) for an actor + flag pair (first 16 bits of SHA-256)."
+  @doc """
+  Deterministic score in `[0.0, 1.0)` for an actor + flag pair (first 16 bits of
+  SHA-256).
+
+  The pairing of actor and flag name means an actor lands at a different point in
+  every flag's rollout, and the result is stable across nodes and restarts — the
+  basis for sticky `percentage_of_actors` gates.
+
+  ## Examples
+
+      iex> Bandera.Gate.score("user-42", :my_flag)
+      0.9317474365234375
+
+      iex> Bandera.Gate.score("user-42", :my_flag) == Bandera.Gate.score("user-42", :my_flag)
+      true
+  """
   @spec score(term, atom) :: float
   def score(actor, flag_name) do
     blob = Actor.id(actor) <> to_string(flag_name)

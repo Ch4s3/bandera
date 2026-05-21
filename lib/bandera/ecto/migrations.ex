@@ -15,6 +15,12 @@ if Code.ensure_loaded?(Ecto.Migration) do
 
     import Ecto.Migration
 
+    @doc """
+    Creates the flags table and its unique index (idempotently).
+
+    Call from the `up/0` of your own migration. The table name is read at runtime
+    from `Bandera.Config.ecto_table_name/0`.
+    """
     @spec up() :: :ok
     def up do
       table_name = Bandera.Config.ecto_table_name()
@@ -35,6 +41,7 @@ if Code.ensure_loaded?(Ecto.Migration) do
       :ok
     end
 
+    @doc "Drops the flags table. Call from the `down/0` of your own migration."
     @spec down() :: :ok
     def down do
       drop(table(Bandera.Config.ecto_table_name()))

@@ -5,6 +5,8 @@ defmodule Bandera.Store.Persistent.Redis.SerializerTest do
   alias Bandera.Gate
   alias Bandera.Store.Persistent.Redis.Serializer
 
+  doctest Bandera.Store.Persistent.Redis.Serializer
+
   describe "serialize/1 -> {field, value}" do
     test "boolean" do
       assert {"boolean", "true"} = Serializer.serialize(Gate.new(:boolean, true))

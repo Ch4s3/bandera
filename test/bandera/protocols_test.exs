@@ -1,6 +1,9 @@
 defmodule Bandera.ProtocolsTest do
   use ExUnit.Case, async: true
 
+  doctest Bandera.Actor
+  doctest Bandera.Group
+
   test "Actor.id/1 for a map uses :id and stringifies it" do
     assert Bandera.Actor.id(%{id: 42}) == "42"
     assert Bandera.Actor.id(%{id: "abc"}) == "abc"

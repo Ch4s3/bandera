@@ -5,6 +5,8 @@ defmodule Bandera.Store.Persistent.Ecto.SerializerTest do
   alias Bandera.Gate
   alias Bandera.Store.Persistent.Ecto.Serializer
 
+  doctest Bandera.Store.Persistent.Ecto.Serializer
+
   describe "to_row/2" do
     test "boolean gate uses the nil-target sentinel" do
       assert %{flag_name: "f", gate_type: "boolean", target: "_bandera_none", enabled: true} =

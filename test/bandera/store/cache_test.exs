@@ -4,6 +4,8 @@ defmodule Bandera.Store.CacheTest do
   alias Bandera.Flag
   alias Bandera.Store.Cache
 
+  doctest Bandera.Store.Cache
+
   setup do
     start_supervised!(Cache)
     Application.put_env(:bandera, :cache, enabled: true, ttl: 900)

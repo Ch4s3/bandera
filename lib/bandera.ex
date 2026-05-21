@@ -17,6 +17,29 @@ defmodule Bandera do
 
   # ---- enabled? ----
 
+  @doc """
+  Returns whether `flag_name` is enabled.
+
+  Pass `for: actor` to evaluate actor, group, and percentage-of-actors gates against
+  a specific subject (the actor is identified via the `Bandera.Actor`/`Bandera.Group`
+  protocols). The flag is read through the active store (cache included). A missing
+  flag, or a store lookup error, resolves to `false` (the error is logged).
+
+  ## Examples
+
+      iex> Bandera.enabled?(:unknown_flag)
+      false
+
+      iex> Bandera.enable(:checkout)
+      iex> Bandera.enabled?(:checkout)
+      true
+
+      iex> Bandera.enable(:beta, for_actor: "user-1")
+      iex> Bandera.enabled?(:beta, for: "user-1")
+      true
+      iex> Bandera.enabled?(:beta, for: "user-2")
+      false
+  """
   @spec enabled?(atom, keyword) :: boolean
   def enabled?(flag_name, options \\ [])
 
@@ -50,6 +73,30 @@ defmodule Bandera do
 
   # ---- enable ----
 
+  @doc """
+  Enables `flag_name`, optionally scoped by an option, and returns `{:ok, enabled?}`.
+
+  With no options the boolean gate is turned on. Supported scopes:
+
+    * `for_actor: actor` — enable for one actor
+    * `for_group: group` — enable for a named group
+    * `for_percentage_of: {:time, ratio}` — enable for a ratio of calls
+    * `for_percentage_of: {:actors, ratio}` — enable for a ratio of actors
+
+  `ratio` is a float in `0.0 < r < 1.0`. The write goes to the persistent store and
+  busts/refreshes the cache; returns `{:error, reason}` if the store write fails.
+
+  ## Examples
+
+      iex> Bandera.enable(:checkout)
+      {:ok, true}
+
+      iex> Bandera.enable(:beta, for_actor: "user-1")
+      {:ok, true}
+
+      iex> Bandera.enable(:gradual, for_percentage_of: {:actors, 0.25})
+      {:ok, true}
+  """
   @spec enable(atom, keyword) :: {:ok, boolean} | {:error, term}
   def enable(flag_name, options \\ [])
 
@@ -81,6 +128,22 @@ defmodule Bandera do
 
   # ---- disable ----
 
+  @doc """
+  Disables `flag_name`, optionally scoped by an option, and returns `{:ok, enabled?}`.
+
+  Accepts the same scopes as `enable/2` (`for_actor:`, `for_group:`,
+  `for_percentage_of:`). For a percentage scope, disabling for `ratio` is equivalent
+  to enabling for `1.0 - ratio`. Returns `{:error, reason}` on a store write failure.
+
+  ## Examples
+
+      iex> Bandera.disable(:checkout)
+      {:ok, false}
+
+      iex> Bandera.enable(:beta)
+      iex> Bandera.disable(:beta)
+      {:ok, false}
+  """
   @spec disable(atom, keyword) :: {:ok, boolean} | {:error, term}
   def disable(flag_name, options \\ [])
 
@@ -114,6 +177,27 @@ defmodule Bandera do
 
   # ---- clear ----
 
+  @doc """
+  Removes gates from `flag_name`, returning `:ok`.
+
+  With no options the whole flag (all its gates) is deleted. A scope removes just
+  that gate, letting evaluation fall through to whatever remains:
+
+    * `boolean: true` — clear the boolean gate
+    * `for_actor: actor` — clear one actor gate
+    * `for_group: group` — clear one group gate
+    * `for_percentage: true` — clear the percentage gate
+
+  Returns `{:error, reason}` if the store delete fails.
+
+  ## Examples
+
+      iex> Bandera.enable(:checkout)
+      iex> Bandera.clear(:checkout)
+      :ok
+      iex> Bandera.enabled?(:checkout)
+      false
+  """
   @spec clear(atom, keyword) :: :ok | {:error, term}
   def clear(flag_name, options \\ [])
 
@@ -147,12 +231,48 @@ defmodule Bandera do
 
   # ---- introspection ----
 
+  @doc """
+  Returns `{:ok, names}` with every known flag name, or `{:error, reason}`.
+
+  ## Examples
+
+      iex> Bandera.enable(:checkout)
+      iex> Bandera.all_flag_names()
+      {:ok, [:checkout]}
+  """
   @spec all_flag_names() :: {:ok, [atom]} | {:error, term}
   def all_flag_names, do: Store.active().all_flag_names()
 
+  @doc """
+  Returns `{:ok, flags}` with every stored `Bandera.Flag`, or `{:error, reason}`.
+
+  ## Examples
+
+      iex> Bandera.enable(:checkout)
+      iex> {:ok, flags} = Bandera.all_flags()
+      iex> Enum.map(flags, & &1.name)
+      [:checkout]
+  """
   @spec all_flags() :: {:ok, [Flag.t()]} | {:error, term}
   def all_flags, do: Store.active().all_flags()
 
+  @doc """
+  Looks up a single flag, returning `{:ok, %Bandera.Flag{}}` or `{:error, reason}`.
+
+  An unknown flag still returns `{:ok, flag}` with an empty gate list (a disabled
+  flag), not an error.
+
+  ## Examples
+
+      iex> Bandera.enable(:checkout)
+      iex> {:ok, flag} = Bandera.get_flag(:checkout)
+      iex> flag.gates
+      [%Bandera.Gate{type: :boolean, for: nil, enabled: true}]
+
+      iex> {:ok, flag} = Bandera.get_flag(:unknown_flag)
+      iex> flag.gates
+      []
+  """
   @spec get_flag(atom) :: {:ok, Flag.t()} | {:error, term}
   def get_flag(flag_name) when is_atom(flag_name), do: Store.active().lookup(flag_name)
 

@@ -26,6 +26,23 @@ defmodule Bandera.Store.Persistent.Ecto.Serializer do
           enabled: boolean
         }
 
+  @doc """
+  Maps a flag name and gate to the row map persisted by the Ecto adapter.
+
+  Percentage gates collapse to `gate_type: "percentage"` with the kind and ratio
+  encoded in `target`; a boolean gate's `nil` target becomes the `"_bandera_none"`
+  sentinel (SQL unique indexes treat `NULL`s as distinct).
+
+  ## Examples
+
+      iex> row = Bandera.Store.Persistent.Ecto.Serializer.to_row(:my_flag, Bandera.Gate.new(:boolean, true))
+      iex> {row.flag_name, row.gate_type, row.target, row.enabled}
+      {"my_flag", "boolean", "_bandera_none", true}
+
+      iex> row = Bandera.Store.Persistent.Ecto.Serializer.to_row(:my_flag, Bandera.Gate.new(:actor, "u1", true))
+      iex> {row.gate_type, row.target}
+      {"actor", "u1"}
+  """
   @spec to_row(atom, Gate.t()) :: row
   def to_row(flag_name, %Gate{} = gate) do
     {gate_type, target} = type_and_target(gate)
@@ -38,11 +55,43 @@ defmodule Bandera.Store.Persistent.Ecto.Serializer do
     }
   end
 
+  @doc """
+  Encodes a gate target for the `target` column.
+
+  `nil` becomes the `"_bandera_none"` sentinel; binaries pass through; everything
+  else is stringified.
+
+  ## Examples
+
+      iex> Bandera.Store.Persistent.Ecto.Serializer.serialize_target(nil)
+      "_bandera_none"
+
+      iex> Bandera.Store.Persistent.Ecto.Serializer.serialize_target("user-1")
+      "user-1"
+
+      iex> Bandera.Store.Persistent.Ecto.Serializer.serialize_target(0.5)
+      "0.5"
+  """
   @spec serialize_target(term) :: String.t()
   def serialize_target(nil), do: @none
   def serialize_target(value) when is_binary(value), do: value
   def serialize_target(value), do: to_string(value)
 
+  @doc """
+  Rebuilds a `Bandera.Flag` from the rows stored for it.
+
+  Rows are sorted for a stable gate order; the flag name is converted to an atom, so
+  it must be a bounded, developer-defined value — never untrusted input.
+
+  ## Examples
+
+      iex> rows = [%{gate_type: "boolean", target: "_bandera_none", enabled: true}]
+      iex> flag = Bandera.Store.Persistent.Ecto.Serializer.deserialize_flag(:my_flag, rows)
+      iex> flag.name
+      :my_flag
+      iex> flag.gates
+      [%Bandera.Gate{type: :boolean, for: nil, enabled: true}]
+  """
   @spec deserialize_flag(atom | String.t(), [map]) :: Flag.t()
   def deserialize_flag(flag_name, rows) when is_list(rows) do
     gates =

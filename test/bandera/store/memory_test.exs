@@ -4,6 +4,8 @@ defmodule Bandera.Store.Persistent.MemoryTest do
   alias Bandera.Gate
   alias Bandera.Store.Persistent.Memory
 
+  doctest Bandera.Store.Persistent.Memory
+
   setup do
     start_supervised!(Memory)
     :ok

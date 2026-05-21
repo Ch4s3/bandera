@@ -20,6 +20,7 @@ if Code.ensure_loaded?(Redix.PubSub) do
 
     @channel "bandera:changes"
 
+    @doc "Starts the notifier GenServer, which opens its own Redis pub and sub connections."
     @spec start_link(keyword) :: GenServer.on_start()
     def start_link(opts \\ []) do
       GenServer.start_link(__MODULE__, opts, name: __MODULE__)

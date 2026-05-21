@@ -2,6 +2,8 @@ defmodule Bandera.GateTest do
   use ExUnit.Case, async: true
   alias Bandera.Gate
 
+  doctest Bandera.Gate
+
   test "boolean gate evaluates to its value regardless of actor" do
     gate = Gate.new(:boolean, true)
     assert Gate.enabled?(gate) == {:ok, true}

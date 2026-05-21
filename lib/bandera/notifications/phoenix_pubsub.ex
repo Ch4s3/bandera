@@ -15,6 +15,7 @@ if Code.ensure_loaded?(Phoenix.PubSub) do
 
     @topic "bandera:changes"
 
+    @doc "Starts the notifier GenServer, which subscribes to the PubSub change topic."
     @spec start_link(keyword) :: GenServer.on_start()
     def start_link(opts \\ []) do
       GenServer.start_link(__MODULE__, opts, name: __MODULE__)

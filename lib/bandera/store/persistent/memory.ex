@@ -5,6 +5,16 @@ defmodule Bandera.Store.Persistent.Memory do
 
   Rows are keyed by `{flag_name, gate_id}` so each gate has exactly one slot
   (both percentage gate types share the `"percentage"` slot).
+
+  ## Examples
+
+      iex> alias Bandera.Store.Persistent.Memory
+      iex> Memory.put(:demo, Bandera.Gate.new(:boolean, true))
+      iex> {:ok, flag} = Memory.get(:demo)
+      iex> flag.gates
+      [%Bandera.Gate{type: :boolean, for: nil, enabled: true}]
+      iex> Memory.all_flag_names()
+      {:ok, [:demo]}
   """
 
   use GenServer
@@ -15,6 +25,7 @@ defmodule Bandera.Store.Persistent.Memory do
 
   @table __MODULE__
 
+  @doc "Starts the adapter GenServer, which owns the backing ETS table, under its module name."
   @spec start_link(keyword) :: GenServer.on_start()
   def start_link(_opts \\ []) do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)

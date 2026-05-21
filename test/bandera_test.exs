@@ -3,6 +3,8 @@ defmodule BanderaTest do
   alias Bandera.Store.Cache
   alias Bandera.Store.Persistent.Memory
 
+  doctest Bandera
+
   setup do
     start_supervised!(Memory)
     start_supervised!(Cache)

@@ -6,6 +6,8 @@ defmodule Bandera.Store.TwoLevelTest do
   alias Bandera.Store.Persistent.Memory
   alias Bandera.Store.TwoLevel
 
+  doctest Bandera.Store.TwoLevel
+
   setup do
     start_supervised!(Memory)
     start_supervised!(Cache)

@@ -3,6 +3,8 @@ defmodule Bandera.FlagTest do
   alias Bandera.Flag
   alias Bandera.Gate
 
+  doctest Bandera.Flag
+
   test "empty flag is disabled" do
     refute Flag.enabled?(Flag.new(:x))
   end

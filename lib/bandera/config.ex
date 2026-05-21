@@ -48,30 +48,39 @@ defmodule Bandera.Config do
     end
   end
 
+  @doc "The active store module (default `Bandera.Store.TwoLevel`)."
   @spec store() :: module
   def store, do: snapshot().store
 
+  @doc "Whether the read cache is enabled (default `true`)."
   @spec cache_enabled?() :: boolean
   def cache_enabled?, do: snapshot().cache_enabled?
 
+  @doc "Cache time-to-live in seconds (default `900`)."
   @spec cache_ttl() :: non_neg_integer
   def cache_ttl, do: snapshot().cache_ttl
 
+  @doc "The persistence adapter module (default `Bandera.Store.Persistent.Memory`)."
   @spec persistence_adapter() :: module
   def persistence_adapter, do: snapshot().persistence_adapter
 
+  @doc "The full persistence keyword config (adapter plus adapter-specific options)."
   @spec persistence() :: keyword
   def persistence, do: snapshot().persistence
 
+  @doc "The SQL table name used by the Ecto adapter (default `\"bandera_flags\"`)."
   @spec ecto_table_name() :: String.t()
   def ecto_table_name, do: Keyword.get(persistence(), :ecto_table_name, "bandera_flags")
 
+  @doc "Whether cross-node cache-busting notifications are enabled (default `false`)."
   @spec notifications_enabled?() :: boolean
   def notifications_enabled?, do: snapshot().notifications_enabled?
 
+  @doc "The notifications adapter module (default `Bandera.Notifications.Redis`)."
   @spec notifications_adapter() :: module
   def notifications_adapter, do: snapshot().notifications_adapter
 
+  @doc "The full notifications keyword config (adapter plus adapter-specific options)."
   @spec notifications() :: keyword
   def notifications, do: snapshot().notifications
 

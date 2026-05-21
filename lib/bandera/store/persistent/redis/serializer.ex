@@ -15,6 +15,23 @@ defmodule Bandera.Store.Persistent.Redis.Serializer do
   alias Bandera.Flag
   alias Bandera.Gate
 
+  @doc """
+  Serializes a gate to the `{field, value}` pair stored in the flag's Redis hash.
+
+  The field is the gate id (so the percentage slot is shared); the value encodes the
+  ratio for percentage gates and the boolean otherwise.
+
+  ## Examples
+
+      iex> Bandera.Store.Persistent.Redis.Serializer.serialize(Bandera.Gate.new(:boolean, true))
+      {"boolean", "true"}
+
+      iex> Bandera.Store.Persistent.Redis.Serializer.serialize(Bandera.Gate.new(:actor, "u1", true))
+      {"actor/u1", "true"}
+
+      iex> Bandera.Store.Persistent.Redis.Serializer.serialize(Bandera.Gate.new(:percentage_of_time, 0.5))
+      {"percentage", "time/0.5"}
+  """
   @spec serialize(Gate.t()) :: {String.t(), String.t()}
   def serialize(%Gate{type: :percentage_of_time, for: ratio} = gate),
     do: {Gate.id(gate), "time/#{ratio}"}
@@ -24,9 +41,32 @@ defmodule Bandera.Store.Persistent.Redis.Serializer do
 
   def serialize(%Gate{enabled: enabled} = gate), do: {Gate.id(gate), to_string(enabled)}
 
+  @doc """
+  Returns the Redis hash field for a gate (its id) — the hash key used to delete it.
+
+  ## Examples
+
+      iex> Bandera.Store.Persistent.Redis.Serializer.field(Bandera.Gate.new(:group, :beta, true))
+      "group/beta"
+  """
   @spec field(Gate.t()) :: String.t()
   def field(%Gate{} = gate), do: Gate.id(gate)
 
+  @doc """
+  Rebuilds a `Bandera.Flag` from a flat `HGETALL` reply (alternating field/value
+  entries).
+
+  The flag name is converted to an atom, so it must be a bounded, developer-defined
+  value — never untrusted input.
+
+  ## Examples
+
+      iex> flag = Bandera.Store.Persistent.Redis.Serializer.deserialize_flag(:my_flag, ["boolean", "true"])
+      iex> flag.name
+      :my_flag
+      iex> flag.gates
+      [%Bandera.Gate{type: :boolean, for: nil, enabled: true}]
+  """
   @spec deserialize_flag(atom | String.t(), [String.t()]) :: Flag.t()
   def deserialize_flag(flag_name, flat) when is_list(flat) do
     gates =
