@@ -54,5 +54,6 @@ defmodule Bandera.ConfigTest do
     b = Config.build_unique_id()
     assert a =~ ~r/\A[0-9a-f]+\z/
     assert a != b
+    assert String.length(a) == 16
   end
 end

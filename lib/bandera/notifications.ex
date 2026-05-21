@@ -15,14 +15,32 @@ defmodule Bandera.Notifications do
         ]
   """
 
+  require Logger
+
   @callback publish_change(flag_name :: atom) :: :ok | {:error, term}
   @callback unique_id() :: String.t()
 
-  @doc "Publish a flag change to other nodes (no-op when notifications are disabled)."
+  @doc "Publish a flag change to other nodes (no-op when notifications are disabled, best-effort when enabled)."
   @spec publish_change(atom) :: :ok | {:error, term}
   def publish_change(flag_name) do
     if Bandera.Config.notifications_enabled?() do
-      Bandera.Config.notifications_adapter().publish_change(flag_name)
+      try do
+        Bandera.Config.notifications_adapter().publish_change(flag_name)
+      rescue
+        error ->
+          Logger.warning(
+            "[Bandera] notification publish failed for #{inspect(flag_name)}: #{Exception.message(error)}"
+          )
+
+          {:error, error}
+      catch
+        :exit, reason ->
+          Logger.warning(
+            "[Bandera] notification publish exited for #{inspect(flag_name)}: #{inspect(reason)}"
+          )
+
+          {:error, {:exit, reason}}
+      end
     else
       :ok
     end
