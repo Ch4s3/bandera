@@ -63,12 +63,38 @@ defmodule Bandera.Store.Persistent.Ecto.SerializerTest do
     end
   end
 
-  describe "rule gates (plan 3)" do
+  describe "rule and segment gates (plan 3)" do
     test "round-trips a rule gate via JSON value" do
       gate = Gate.new(:rule, [Bandera.Constraint.new("plan", :eq, "premium")], true)
       row = Serializer.to_row(:f, gate)
       assert row.gate_type == "rule"
       assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [row])
+    end
+
+    test "round-trips a segment gate" do
+      gate = Gate.new(:segment, :premium_us, true)
+      row = Serializer.to_row(:f, gate)
+      assert row.gate_type == "segment"
+      assert row.target == "premium_us"
+      assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [row])
+    end
+  end
+
+  describe "prerequisite gates (plan 4)" do
+    test "round-trips a prerequisite gate" do
+      gate = Gate.new(:prerequisite, :parent, true)
+
+      assert %Flag{gates: [^gate]} =
+               Serializer.deserialize_flag(:f, [Serializer.to_row(:f, gate)])
+    end
+  end
+
+  describe "schedule gates (plan 4)" do
+    test "round-trips a schedule gate" do
+      gate = Gate.new(:schedule, {"2026-01-01T00:00:00Z", nil})
+
+      assert %Flag{gates: [^gate]} =
+               Serializer.deserialize_flag(:f, [Serializer.to_row(:f, gate)])
     end
   end
 

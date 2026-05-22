@@ -44,6 +44,9 @@ defmodule Bandera.Store.Persistent.Redis.Serializer do
   def serialize(%Gate{type: :rule, value: constraints} = gate),
     do: {Gate.id(gate), Jason.encode!(Enum.map(constraints, &Bandera.Constraint.to_map/1))}
 
+  def serialize(%Gate{type: :schedule, value: window} = gate),
+    do: {Gate.id(gate), Jason.encode!(window)}
+
   def serialize(%Gate{enabled: enabled} = gate), do: {Gate.id(gate), to_string(enabled)}
 
   @doc """
@@ -96,6 +99,12 @@ defmodule Bandera.Store.Persistent.Redis.Serializer do
       enabled: true,
       value: json |> Jason.decode!() |> Enum.map(&Bandera.Constraint.from_map/1)
     }
+
+  defp deserialize_pair(["prerequisite/" <> parent, value]),
+    do: %Gate{type: :prerequisite, for: String.to_atom(parent), enabled: parse_bool(value)}
+
+  defp deserialize_pair(["schedule", json]),
+    do: %Gate{type: :schedule, for: nil, enabled: true, value: Jason.decode!(json)}
 
   defp deserialize_pair(["segment/" <> name, value]),
     do: %Gate{type: :segment, for: name, enabled: parse_bool(value)}

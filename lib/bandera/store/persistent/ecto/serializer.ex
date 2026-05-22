@@ -114,6 +114,11 @@ defmodule Bandera.Store.Persistent.Ecto.Serializer do
   defp type_and_target(%Gate{type: :rule}), do: {"rule", @none}
   defp type_and_target(%Gate{type: :segment, for: name}), do: {"segment", name}
 
+  defp type_and_target(%Gate{type: :prerequisite, for: parent}),
+    do: {"prerequisite", to_string(parent)}
+
+  defp type_and_target(%Gate{type: :schedule}), do: {"schedule", @none}
+
   defp type_and_target(%Gate{type: type, for: target}),
     do: {to_string(type), serialize_target(target)}
 
@@ -121,6 +126,8 @@ defmodule Bandera.Store.Persistent.Ecto.Serializer do
 
   defp encode_value(%Gate{type: :rule, value: constraints}),
     do: Jason.encode!(Enum.map(constraints, &Bandera.Constraint.to_map/1))
+
+  defp encode_value(%Gate{type: :schedule, value: window}), do: Jason.encode!(window)
 
   defp encode_value(%Gate{}), do: nil
 
@@ -134,6 +141,12 @@ defmodule Bandera.Store.Persistent.Ecto.Serializer do
       enabled: enabled,
       value: value |> Jason.decode!() |> Enum.map(&Bandera.Constraint.from_map/1)
     }
+
+  defp to_gate(%{gate_type: "prerequisite", target: parent, enabled: required}),
+    do: %Gate{type: :prerequisite, for: String.to_atom(parent), enabled: required}
+
+  defp to_gate(%{gate_type: "schedule", value: value}),
+    do: %Gate{type: :schedule, for: nil, enabled: true, value: Jason.decode!(value)}
 
   defp to_gate(%{gate_type: "segment", target: name, enabled: enabled}),
     do: %Gate{type: :segment, for: name, enabled: enabled}

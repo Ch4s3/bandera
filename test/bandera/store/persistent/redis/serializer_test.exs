@@ -63,6 +63,13 @@ defmodule Bandera.Store.Persistent.Redis.SerializerTest do
     end
   end
 
+  test "round-trips a segment gate" do
+    gate = Gate.new(:segment, :premium_us, true)
+    {field, value} = Serializer.serialize(gate)
+    assert field == "segment/premium_us"
+    assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [field, value])
+  end
+
   test "round-trips a rule gate via JSON" do
     gate = Gate.new(:rule, [Bandera.Constraint.new("plan", :eq, "premium")], true)
     {field, value} = Serializer.serialize(gate)
@@ -72,6 +79,20 @@ defmodule Bandera.Store.Persistent.Redis.SerializerTest do
              %{"attribute" => "plan", "operator" => "eq", "values" => ["premium"]}
            ]
 
+    assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [field, value])
+  end
+
+  test "round-trips a prerequisite gate" do
+    gate = Gate.new(:prerequisite, :parent, true)
+    {field, value} = Serializer.serialize(gate)
+    assert field == "prerequisite/parent"
+    assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [field, value])
+  end
+
+  test "round-trips a schedule gate" do
+    gate = Gate.new(:schedule, {"2026-01-01T00:00:00Z", nil})
+    {field, value} = Serializer.serialize(gate)
+    assert field == "schedule"
     assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [field, value])
   end
 
