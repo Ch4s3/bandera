@@ -51,9 +51,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                   class={["bandera-toggle", !boolean_on?(flag) && "bandera-off"]}
                   phx-click="toggle_boolean"
                   phx-value-flag={flag.name}
-                >
-                  {if boolean_on?(flag), do: "on", else: "off"}
-                </button>
+                >{if boolean_on?(flag), do: "on", else: "off"}</button>
                 <button type="button" phx-click="toggle_row" phx-value-flag={flag.name}>
                   {if expanded?(@expanded, flag), do: "▴", else: "▾"}
                 </button>
@@ -82,7 +80,49 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           do: MapSet.delete(expanded, name),
           else: MapSet.put(expanded, name)
 
-      {:noreply, assign(socket, :expanded, expanded)}
+      {:noreply, socket |> assign(:flash_error, nil) |> assign(:expanded, expanded)}
+    end
+
+    def handle_event("toggle_boolean", %{"flag" => name}, socket) do
+      flag_name = String.to_existing_atom(name)
+
+      if currently_on?(socket, name),
+        do: Bandera.disable(flag_name),
+        else: Bandera.enable(flag_name)
+
+      {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
+    end
+
+    def handle_event("add_actor", %{"flag" => name, "actor" => actor}, socket) do
+      actor = String.trim(actor)
+
+      if actor == "" do
+        {:noreply, assign(socket, :flash_error, "Actor id can't be blank.")}
+      else
+        Bandera.enable(String.to_existing_atom(name), for_actor: actor)
+        {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
+      end
+    end
+
+    def handle_event("remove_actor", %{"flag" => name, "actor" => actor}, socket) do
+      Bandera.clear(String.to_existing_atom(name), for_actor: actor)
+      {:noreply, refresh(socket)}
+    end
+
+    def handle_event("add_group", %{"flag" => name, "group" => group}, socket) do
+      group = String.trim(group)
+
+      if group == "" do
+        {:noreply, assign(socket, :flash_error, "Group name can't be blank.")}
+      else
+        Bandera.enable(String.to_existing_atom(name), for_group: group)
+        {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
+      end
+    end
+
+    def handle_event("remove_group", %{"flag" => name, "group" => group}, socket) do
+      Bandera.clear(String.to_existing_atom(name), for_group: group)
+      {:noreply, refresh(socket)}
     end
 
     # ---- editor (inline; extract into Components later if it grows) ----
@@ -202,5 +242,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp group_targets(flag) do
       for g <- flag.gates, Bandera.Gate.group?(g), do: g.for
     end
+
+    defp currently_on?(socket, name) do
+      Enum.any?(socket.assigns.all_flags, fn flag ->
+        to_string(flag.name) == name and boolean_on?(flag)
+      end)
+    end
+
+    defp refresh(socket), do: load_flags(socket)
   end
 end

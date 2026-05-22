@@ -69,4 +69,45 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
     assert html =~ "add group"
     assert html =~ "Clear whole flag"
   end
+
+  test "toggling boolean enables then disables the flag", %{conn: conn} do
+    {:ok, false} = Bandera.disable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+
+    html = render_click(live, "toggle_boolean", %{"flag" => "billing_invoices"})
+    assert html =~ ">on<"
+    assert Bandera.enabled?(:billing_invoices)
+
+    html = render_click(live, "toggle_boolean", %{"flag" => "billing_invoices"})
+    assert html =~ ">off<"
+    refute Bandera.enabled?(:billing_invoices)
+  end
+
+  test "add and remove an actor gate", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html = render_submit(live, "add_actor", %{"flag" => "billing_invoices", "actor" => "user-1"})
+    assert html =~ "user-1"
+    assert Bandera.enabled?(:billing_invoices, for: "user-1")
+
+    html =
+      render_click(live, "remove_actor", %{"flag" => "billing_invoices", "actor" => "user-1"})
+
+    refute html =~ "user-1"
+  end
+
+  test "add and remove a group gate", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html = render_submit(live, "add_group", %{"flag" => "billing_invoices", "group" => "beta"})
+    assert html =~ "beta"
+    assert Bandera.enabled?(:billing_invoices, for: %{id: 1, groups: [:beta]})
+
+    html = render_click(live, "remove_group", %{"flag" => "billing_invoices", "group" => "beta"})
+    refute html =~ ">beta<"
+  end
 end
