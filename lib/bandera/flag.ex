@@ -71,18 +71,21 @@ defmodule Bandera.Flag do
             result
 
           :ignore ->
-            # actor path precedence: rule -> boolean -> percentage. Percentage is
+            # actor path precedence: rule -> boolean -> schedule -> percentage. Percentage is
             # resolved only via check_percentage_gate/3 (which prefers
             # percentage_of_actors and falls back to percentage_of_time), so a
             # percentage_of_time gate is evaluated at most once — folding base/1 in
             # here would draw its random outcome twice and inflate its probability.
             check_rule_gates(gates, context) || check_boolean_gate(gates) ||
-              check_percentage_gate(gates, item, name)
+              check_schedule_gates(gates) || check_percentage_gate(gates, item, name)
         end
     end
   end
 
-  defp base(gates), do: check_boolean_gate(gates) || check_percentage_of_time_gate(gates)
+  defp base(gates),
+    do:
+      check_boolean_gate(gates) || check_schedule_gates(gates) ||
+        check_percentage_of_time_gate(gates)
 
   defp check_rule_gates(gates, context) do
     gates
@@ -161,6 +164,12 @@ defmodule Bandera.Flag do
       if pick < acc, do: {:halt, {acc, name}}, else: {:cont, {acc, name}}
     end)
     |> elem(1)
+  end
+
+  defp check_schedule_gates(gates) do
+    gates
+    |> Enum.filter(&Gate.schedule?/1)
+    |> Enum.any?(fn gate -> match?({:ok, true}, Gate.enabled?(gate)) end)
   end
 
   defp check_boolean_gate(gates) do

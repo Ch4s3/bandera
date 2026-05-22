@@ -70,6 +70,28 @@ defmodule Bandera.FlagTest do
     assert Enum.uniq(results) == [expected]
   end
 
+  describe "schedule gates" do
+    test "an active schedule gate enables the flag" do
+      past = DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.to_iso8601()
+      future = DateTime.utc_now() |> DateTime.add(60, :second) |> DateTime.to_iso8601()
+      flag = Bandera.Flag.new(:f, [Bandera.Gate.new(:schedule, {past, future})])
+      assert Bandera.Flag.enabled?(flag)
+    end
+
+    test "an active schedule gate enables a flag even when evaluated with a for: actor" do
+      past = DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.to_iso8601()
+      future = DateTime.utc_now() |> DateTime.add(60, :second) |> DateTime.to_iso8601()
+      flag = Bandera.Flag.new(:f, [Bandera.Gate.new(:schedule, {past, future})])
+      assert Bandera.Flag.enabled?(flag, for: %{id: 1})
+    end
+
+    test "a future-only schedule gate disables the flag" do
+      future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
+      flag = Bandera.Flag.new(:f, [Bandera.Gate.new(:schedule, {future, nil})])
+      refute Bandera.Flag.enabled?(flag)
+    end
+  end
+
   describe "rule gates with context" do
     test "matches when all constraints satisfy the context" do
       gate = Bandera.Gate.new(:rule, [Bandera.Constraint.new("plan", :eq, "premium")], true)
