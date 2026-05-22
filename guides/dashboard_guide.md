@@ -6,34 +6,101 @@ lives in the core library but is inert unless your app depends on
 changes**: it inherits your app's layout and runs on your existing LiveView
 socket.
 
-## Setup
+## Install in a Phoenix app
 
-1. Add LiveView to your deps (you almost certainly already have it):
+The dashboard is a LiveView that runs inside your app. It needs LiveView wired up
+(a socket + `app.js`), Bandera configured with a storage backend, and a route
+mounted behind your auth. Apps generated with `mix phx.new --live` already have
+the LiveView pieces (step 2).
 
-   ```elixir
-   {:phoenix_live_view, "~> 1.0"}
-   ```
+### 1. Add the dependencies
 
-2. Mount it in your router **behind your own auth pipeline**:
+```elixir
+# mix.exs
+def deps do
+  [
+    {:bandera, "~> 0.1"},
+    {:phoenix_live_view, "~> 1.0"}
+  ]
+end
+```
 
-   ```elixir
-   import Bandera.Dashboard.Router
+Run `mix deps.get`. The dashboard only compiles when `phoenix_live_view` is
+present — without it, Bandera still works as a plain flag library.
 
-   scope "/admin" do
-     pipe_through [:browser, :require_admin]   # YOUR authentication/authorization
-     bandera_dashboard "/flags"
-   end
-   ```
+### 2. Make sure LiveView is wired up
 
-   The dashboard can toggle production features. **Never** mount it on an
-   unauthenticated route.
+The dashboard reuses your app's LiveView socket and JavaScript; it ships none of
+its own. If you generated your app with `--live` this is already done. Otherwise
+confirm both:
 
-The dashboard sets no root layout — it inherits the one from your pipeline — and
-relies on your app's `app.js` / `LiveSocket` for interactivity. Mount it under a
-pipeline whose layout loads `app.js` (the default `:browser` pipeline does). By
+```elixir
+# lib/my_app_web/endpoint.ex
+socket "/live", Phoenix.LiveView.Socket
+```
+
+```javascript
+// assets/js/app.js
+import {Socket} from "phoenix"
+import {LiveSocket} from "phoenix_live_view"
+
+const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
+const liveSocket = new LiveSocket("/live", Socket, {params: {_csrf_token: csrfToken}})
+liveSocket.connect()
+```
+
+Mount the dashboard under a pipeline whose layout loads that `app.js` (the default
+`:browser` pipeline does). Without the socket the page still renders, but toggles,
+search, and gate editing won't work.
+
+### 3. Configure a storage backend
+
+The dashboard reads and writes real flags through Bandera, so configure a
+persistence backend (defaults to in-memory, which is per-node and resets on
+restart — fine for trying it out, not for production). For example, Ecto:
+
+```elixir
+# config/runtime.exs
+config :bandera,
+  store: Bandera.Store.TwoLevel,
+  persistence: [adapter: Bandera.Store.Persistent.Ecto, repo: MyApp.Repo]
+```
+
+See the [README](README.md) for all backends (Ecto, Redis, in-memory) and
+cross-node cache-bust notifications.
+
+### 4. Mount the route behind your auth
+
+```elixir
+# lib/my_app_web/router.ex
+import Bandera.Dashboard.Router
+
+scope "/admin" do
+  pipe_through [:browser, :require_admin]   # YOUR authentication/authorization
+  bandera_dashboard "/flags"
+end
+```
+
+The dashboard can toggle production features, so **never** mount it on an
+unauthenticated route. You can also hook authorization into the LiveView's own
+mount lifecycle with `:on_mount`:
+
+```elixir
+bandera_dashboard "/flags", on_mount: {MyAppWeb.AdminAuth, :ensure_admin}
+```
+
+Mount it more than once (e.g. per environment) by passing a distinct
+`:live_session_name`.
+
+### 5. Visit it
+
+Start your server and open `/admin/flags`. Flags are created in code/IEx (e.g.
+`Bandera.enable(:my_flag)`); the dashboard manages their gates from there.
+
+The dashboard sets no root layout — it inherits the one from your pipeline. By
 default its CSS is self-contained and inlined, with `bandera-`-prefixed selectors,
-so it won't clash with your styles. See [Theming](#theming) to retheme it or to
-switch to daisyUI.
+so it needs **no asset-pipeline changes** and won't clash with your styles. See
+[Theming](#theming) to retheme it or switch to daisyUI.
 
 ## Grouping
 
