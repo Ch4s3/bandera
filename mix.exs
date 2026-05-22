@@ -149,7 +149,9 @@ defmodule Bandera.MixProject do
       {:stream_data, "~> 1.0", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:assay, "~> 0.5", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      # Dev-only HTTP server for the local dashboard preview (dev/preview.exs).
+      {:bandit, "~> 1.0", only: :dev}
     ]
   end
 end
