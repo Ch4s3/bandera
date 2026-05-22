@@ -63,6 +63,18 @@ defmodule Bandera.Store.Persistent.Redis.SerializerTest do
     end
   end
 
+  test "round-trips a rule gate via JSON" do
+    gate = Gate.new(:rule, [Bandera.Constraint.new("plan", :eq, "premium")], true)
+    {field, value} = Serializer.serialize(gate)
+    assert field == "rule"
+
+    assert Jason.decode!(value) == [
+             %{"attribute" => "plan", "operator" => "eq", "values" => ["premium"]}
+           ]
+
+    assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [field, value])
+  end
+
   test "round-trips a variant gate via JSON" do
     gate = Bandera.Gate.new(:variant, %{"a" => 1, "b" => 2})
     {field, value} = Serializer.serialize(gate)

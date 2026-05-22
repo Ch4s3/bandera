@@ -111,15 +111,28 @@ defmodule Bandera.Store.Persistent.Ecto.Serializer do
 
   defp type_and_target(%Gate{type: :boolean}), do: {"boolean", @none}
   defp type_and_target(%Gate{type: :variant}), do: {"variant", @none}
+  defp type_and_target(%Gate{type: :rule}), do: {"rule", @none}
 
   defp type_and_target(%Gate{type: type, for: target}),
     do: {to_string(type), serialize_target(target)}
 
   defp encode_value(%Gate{type: :variant, value: weights}), do: Jason.encode!(weights)
+
+  defp encode_value(%Gate{type: :rule, value: constraints}),
+    do: Jason.encode!(Enum.map(constraints, &Bandera.Constraint.to_map/1))
+
   defp encode_value(%Gate{}), do: nil
 
   defp to_gate(%{gate_type: "variant", value: value}),
     do: %Gate{type: :variant, for: nil, enabled: true, value: Jason.decode!(value)}
+
+  defp to_gate(%{gate_type: "rule", value: value, enabled: enabled}),
+    do: %Gate{
+      type: :rule,
+      for: nil,
+      enabled: enabled,
+      value: value |> Jason.decode!() |> Enum.map(&Bandera.Constraint.from_map/1)
+    }
 
   defp to_gate(%{gate_type: "boolean", enabled: enabled}),
     do: %Gate{type: :boolean, for: nil, enabled: enabled}

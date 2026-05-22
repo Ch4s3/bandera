@@ -63,6 +63,15 @@ defmodule Bandera.Store.Persistent.Ecto.SerializerTest do
     end
   end
 
+  describe "rule gates (plan 3)" do
+    test "round-trips a rule gate via JSON value" do
+      gate = Gate.new(:rule, [Bandera.Constraint.new("plan", :eq, "premium")], true)
+      row = Serializer.to_row(:f, gate)
+      assert row.gate_type == "rule"
+      assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [row])
+    end
+  end
+
   test "serialize_target/1 maps nil to the sentinel" do
     assert Serializer.serialize_target(nil) == "_bandera_none"
     assert Serializer.serialize_target("x") == "x"
