@@ -1,13 +1,15 @@
 defmodule Bandera.Usage do
   @moduledoc """
-  Optional last-evaluated tracker. Attaches to `[:bandera, :enabled?]` and records,
-  in ETS, the last time each flag was checked — the signal for `Bandera.stale_flags/1`.
-  Start it in your supervision tree and call `Bandera.Usage.attach/0` once at boot.
+  Optional last-evaluated tracker. Attaches to `[:bandera, :enabled?]` and
+  `[:bandera, :variant]` and records, in ETS, the last time each flag was checked —
+  the signal for `Bandera.stale_flags/1`. Start it in your supervision tree and call
+  `Bandera.Usage.attach/0` once at boot.
   """
   use GenServer
 
   @table __MODULE__
-  @handler {__MODULE__, :enabled?}
+  @handler {__MODULE__, :usage}
+  @events [[:bandera, :enabled?], [:bandera, :variant]]
 
   @spec start_link(keyword) :: GenServer.on_start()
   def start_link(opts \\ []),
@@ -21,7 +23,7 @@ defmodule Bandera.Usage do
 
   @spec attach() :: :ok | {:error, :already_exists}
   def attach do
-    :telemetry.attach(@handler, [:bandera, :enabled?], &__MODULE__.handle/4, nil)
+    :telemetry.attach_many(@handler, @events, &__MODULE__.handle/4, nil)
   end
 
   @spec detach() :: :ok | {:error, :not_found}
@@ -29,7 +31,7 @@ defmodule Bandera.Usage do
 
   @doc false
   @spec handle(list, map, map, term) :: :ok
-  def handle([:bandera, :enabled?], _measurements, %{flag_name: flag_name}, _config) do
+  def handle([:bandera, _event], _measurements, %{flag_name: flag_name}, _config) do
     :ets.insert(@table, {flag_name, DateTime.utc_now()})
     :ok
   end

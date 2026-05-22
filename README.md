@@ -247,9 +247,10 @@ defmodule MyApp.Repo.Migrations.BanderaSchemaV2 do
 end
 ```
 
-`upgrade_v2/0` adds the nullable `value` column to an existing table via
-`add_if_not_exists`, so it is safe to run even if the column already exists.
-New installs calling `Bandera.Ecto.Migrations.up()` get the column automatically.
+`upgrade_v2/0` adds the nullable `value` column to an existing table with a plain
+`add/2` (so it also works on adapters such as SQLite3 that reject conditional column
+additions); run it once from a versioned migration. New installs calling
+`Bandera.Ecto.Migrations.up()` get the column automatically.
 
 ## Testing
 

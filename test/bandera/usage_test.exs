@@ -37,6 +37,14 @@ defmodule Bandera.UsageTest do
     assert %DateTime{} = Usage.last_evaluated(:checked)
   end
 
+  test "records usage when a flag is resolved via variant/2" do
+    {:ok, _} = Bandera.put_variants(:hero, %{"a" => 1, "b" => 1})
+    refute Usage.last_evaluated(:hero)
+
+    _ = Bandera.variant(:hero, for: %{id: 1})
+    assert %DateTime{} = Usage.last_evaluated(:hero)
+  end
+
   test "stale_flags returns flags not evaluated within the window" do
     {:ok, _} = Bandera.enable(:fresh)
     {:ok, _} = Bandera.enable(:old)
