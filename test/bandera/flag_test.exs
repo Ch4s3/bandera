@@ -69,4 +69,29 @@ defmodule Bandera.FlagTest do
     results = Enum.map(1..50, fn _ -> Flag.enabled?(flag, for: actor) end)
     assert Enum.uniq(results) == [expected]
   end
+
+  describe "variant/2" do
+    test "returns the :default when the flag has no variant gate" do
+      flag = Bandera.Flag.new(:f, [Bandera.Gate.new(:boolean, true)])
+      assert Bandera.Flag.variant(flag, for: %{id: 1}, default: "control") == "control"
+    end
+
+    test "returns the :default when no actor is given (no stable bucket)" do
+      flag = Bandera.Flag.new(:f, [Bandera.Gate.new(:variant, %{"a" => 1, "b" => 1})])
+      assert Bandera.Flag.variant(flag, default: "control") == "control"
+    end
+
+    test "picks a variant by stable per-actor bucketing" do
+      flag = Bandera.Flag.new(:f, [Bandera.Gate.new(:variant, %{"a" => 1, "b" => 1})])
+      chosen = Bandera.Flag.variant(flag, for: %{id: 1})
+      assert chosen in ["a", "b"]
+      # sticky: same actor + flag always lands in the same variant
+      assert Bandera.Flag.variant(flag, for: %{id: 1}) == chosen
+    end
+
+    test "a 100/0 split always picks the only weighted variant" do
+      flag = Bandera.Flag.new(:f, [Bandera.Gate.new(:variant, %{"only" => 1, "never" => 0})])
+      assert Bandera.Flag.variant(flag, for: %{id: 99}) == "only"
+    end
+  end
 end

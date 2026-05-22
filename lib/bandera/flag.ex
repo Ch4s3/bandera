@@ -98,6 +98,43 @@ defmodule Bandera.Flag do
     end
   end
 
+  @doc """
+  Returns the variant chosen for the actor, or `options[:default]` (nil if not given).
+
+  Requires a variant gate to exist on the flag and `:for` to be provided. The bucket
+  is stable per actor+flag using the SHA-256 score from `Bandera.Gate.score/2`.
+
+  ## Examples
+
+      iex> flag = Bandera.Flag.new(:f, [Bandera.Gate.new(:variant, %{"a" => 1, "b" => 1})])
+      iex> v = Bandera.Flag.variant(flag, for: %{id: 1})
+      iex> v in ["a", "b"]
+      true
+  """
+  @spec variant(t, keyword) :: term
+  def variant(%__MODULE__{gates: gates, name: name}, options \\ []) do
+    default = Keyword.get(options, :default)
+
+    with %Gate{value: weights} <- Enum.find(gates, &Gate.variant?/1),
+         {:ok, actor} when not is_nil(actor) <- Keyword.fetch(options, :for) do
+      allocate(weights, Gate.score(actor, name))
+    else
+      _ -> default
+    end
+  end
+
+  defp allocate(weights, score) do
+    total = weights |> Map.values() |> Enum.sum()
+    pick = score * total
+    sorted = Enum.sort_by(weights, fn {name, _w} -> name end)
+
+    Enum.reduce_while(sorted, {0.0, nil}, fn {name, weight}, {acc, _last} ->
+      acc = acc + weight
+      if pick < acc, do: {:halt, {acc, name}}, else: {:cont, {acc, name}}
+    end)
+    |> elem(1)
+  end
+
   defp check_boolean_gate(gates) do
     case Enum.find(gates, &Gate.boolean?/1) do
       nil ->
