@@ -12,7 +12,20 @@ defmodule Bandera.MixProject do
       deps: deps(),
       description: "Feature flag library with runtime config for storage backends and caching.",
       package: package(),
-      test_coverage: [summary: [threshold: 85]],
+      test_coverage: [
+        summary: [threshold: 85],
+        ignore_modules: [
+          # Router macro: its body expands at compile time, so runtime coverage
+          # always reports 0%. It is exercised via the LiveView mount tests.
+          Bandera.Dashboard.Router,
+          # Test-only scaffolding for the dashboard LiveView tests (not shipped).
+          Bandera.Dashboard.TestEndpoint,
+          Bandera.Dashboard.TestLayouts,
+          Bandera.Dashboard.TestPubSub,
+          Bandera.Dashboard.TestRouter,
+          ~r/\.TestRouter\.Helpers$/
+        ]
+      ],
       # Incremental Dialyzer via `mix assay`:
       assay: [
         dialyzer: [

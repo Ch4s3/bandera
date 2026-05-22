@@ -148,6 +148,69 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
     refute Bandera.enabled?(:billing_invoices)
   end
 
+  test "set_percentage of time renders percent of time", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html =
+      render_submit(live, "set_percentage", %{
+        "flag" => "billing_invoices",
+        "percent" => "10",
+        "kind" => "time"
+      })
+
+    assert html =~ "10% of time"
+  end
+
+  test "set_percentage rejects non-numeric input", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html =
+      render_submit(live, "set_percentage", %{
+        "flag" => "billing_invoices",
+        "percent" => "abc",
+        "kind" => "actors"
+      })
+
+    assert html =~ "between 1 and 99"
+  end
+
+  test "add_actor with a blank id shows a validation error", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html = render_submit(live, "add_actor", %{"flag" => "billing_invoices", "actor" => "   "})
+    assert html =~ "Actor id can"
+  end
+
+  test "add_group with a blank name shows a validation error", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html = render_submit(live, "add_group", %{"flag" => "billing_invoices", "group" => ""})
+    assert html =~ "Group name can"
+  end
+
+  test "ignores unrelated info messages", %{conn: conn} do
+    {:ok, live, _html} = live(conn, "/flags")
+    send(live.pid, :some_unrelated_message)
+    assert render(live) =~ "Bandera"
+  end
+
+  test "clearing an expanded flag collapses and removes it", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html = render_click(live, "clear_flag", %{"flag" => "billing_invoices"})
+    refute html =~ "invoices"
+  end
+
   test "refreshes when another node broadcasts a flag change", %{conn: conn} do
     Application.put_env(:bandera, :cache_bust_notifications,
       enabled: true,
