@@ -93,6 +93,9 @@ defmodule Bandera.Store.Persistent.Redis.Serializer do
       value: json |> Jason.decode!() |> Enum.map(&Bandera.Constraint.from_map/1)
     }
 
+  defp deserialize_pair(["segment/" <> name, value]),
+    do: %Gate{type: :segment, for: name, enabled: parse_bool(value)}
+
   defp deserialize_pair(["boolean", value]),
     do: %Gate{type: :boolean, for: nil, enabled: parse_bool(value)}
 

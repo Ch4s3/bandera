@@ -107,6 +107,11 @@ defmodule Bandera.Gate do
     %__MODULE__{type: :rule, for: nil, enabled: enabled, value: constraints}
   end
 
+  @spec new(:segment, atom | String.t(), boolean) :: t
+  def new(:segment, name, enabled) when is_boolean(enabled) do
+    %__MODULE__{type: :segment, for: to_string(name), enabled: enabled}
+  end
+
   @doc """
   Returns `true` if the gate is a `:boolean` gate.
 
@@ -213,6 +218,21 @@ defmodule Bandera.Gate do
   def rule?(%__MODULE__{}), do: false
 
   @doc """
+  Returns `true` if the gate is a `:segment` gate.
+
+  ## Examples
+
+      iex> Bandera.Gate.segment?(Bandera.Gate.new(:segment, :premium, true))
+      true
+
+      iex> Bandera.Gate.segment?(Bandera.Gate.new(:boolean, true))
+      false
+  """
+  @spec segment?(t) :: boolean
+  def segment?(%__MODULE__{type: :segment}), do: true
+  def segment?(%__MODULE__{}), do: false
+
+  @doc """
   Returns the gate's storage id, used as the per-flag slot key.
 
   Both percentage gate types collapse to `"percentage"` (a flag holds at most one
@@ -237,6 +257,7 @@ defmodule Bandera.Gate do
   def id(%__MODULE__{type: :percentage_of_actors}), do: "percentage"
   def id(%__MODULE__{type: :variant}), do: "variant"
   def id(%__MODULE__{type: :rule}), do: "rule"
+  def id(%__MODULE__{type: :segment, for: name}), do: "segment/#{name}"
 
   @doc """
   Evaluates a single gate against `options`.

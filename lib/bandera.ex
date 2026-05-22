@@ -66,8 +66,31 @@ defmodule Bandera do
     end
   end
 
-  # Placeholder — replaced in Task 7 with real segment expansion.
-  defp expand_segments(flag), do: flag
+  @segment_prefix "bandera_segment:"
+
+  # Expand each :segment gate into the referenced segment's :rule gate so the pure
+  # Flag evaluator can resolve it. Unresolvable segments are dropped (ignored).
+  defp expand_segments(%Flag{gates: gates} = flag) do
+    expanded =
+      Enum.flat_map(gates, fn
+        %Gate{type: :segment, for: name, enabled: enabled} ->
+          case Store.active().lookup(String.to_atom(@segment_prefix <> name)) do
+            {:ok, %Flag{gates: seg_gates}} ->
+              case Enum.find(seg_gates, &Gate.rule?/1) do
+                %Gate{value: constraints} -> [Gate.new(:rule, constraints, enabled)]
+                _ -> []
+              end
+
+            _ ->
+              []
+          end
+
+        gate ->
+          [gate]
+      end)
+
+    %{flag | gates: expanded}
+  end
 
   defp track_enabled?(flag_name, options, result) do
     Bandera.Telemetry.event([:enabled?], %{flag_name: flag_name, options: options, result: result})
@@ -139,6 +162,9 @@ defmodule Bandera do
     gate = Gate.new(:rule, Enum.map(constraints, &to_constraint/1), true)
     put_constant(flag_name, gate, true)
   end
+
+  defp do_enable(flag_name, for_segment: name) when is_atom(flag_name),
+    do: put_constant(flag_name, Gate.new(:segment, name, true), true)
 
   defp to_constraint(%Bandera.Constraint{} = c), do: c
 
@@ -315,8 +341,6 @@ defmodule Bandera do
   end
 
   # ---- segments ----
-
-  @segment_prefix "bandera_segment:"
 
   @doc """
   Stores a reusable named constraint set (a segment) under the reserved key
