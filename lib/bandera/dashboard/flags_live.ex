@@ -69,6 +69,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
+    @impl true
+    def handle_event("search", %{"q" => q}, socket) do
+      {:noreply, socket |> assign(search: q) |> recompute_groups()}
+    end
+
+    def handle_event("toggle_row", %{"flag" => name}, socket) do
+      expanded = socket.assigns.expanded
+
+      expanded =
+        if MapSet.member?(expanded, name),
+          do: MapSet.delete(expanded, name),
+          else: MapSet.put(expanded, name)
+
+      {:noreply, assign(socket, :expanded, expanded)}
+    end
+
     # ---- editor (inline; extract into Components later if it grows) ----
 
     defp render_editor(assigns, flag) do

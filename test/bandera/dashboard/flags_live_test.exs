@@ -47,4 +47,26 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
     assert html =~ "Ungrouped"
     assert html =~ "beta"
   end
+
+  test "search filters the flag list", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, true} = Bandera.enable(:search_fuzzy)
+
+    {:ok, live, _html} = live(conn, "/flags")
+    html = render_change(form(live, "form[phx-change=search]"), %{"q" => "invoic"})
+
+    assert html =~ "invoices"
+    refute html =~ "fuzzy"
+  end
+
+  test "expanding a row reveals its gate editor", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, html} = live(conn, "/flags")
+    refute html =~ "add actor"
+
+    html = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+    assert html =~ "add actor"
+    assert html =~ "add group"
+    assert html =~ "Clear whole flag"
+  end
 end
