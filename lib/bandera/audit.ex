@@ -27,7 +27,7 @@ defmodule Bandera.Audit do
   @actions [:enable, :disable, :clear]
 
   @doc false
-  @spec from_telemetry([atom], map) :: Event.t()
+  @spec from_telemetry([atom], map) :: Event.t() | :ignore
   def from_telemetry([:bandera, action, :stop], metadata) when action in @actions do
     options = Map.get(metadata, :options, [])
 
@@ -41,6 +41,8 @@ defmodule Bandera.Audit do
     }
   end
 
+  def from_telemetry(_event_name, _metadata), do: :ignore
+
   @stop_events for action <- @actions, do: [:bandera, action, :stop]
 
   @doc """
@@ -52,7 +54,12 @@ defmodule Bandera.Audit do
     :telemetry.attach_many(
       handler_id,
       @stop_events,
-      fn event_name, _measurements, metadata, cb -> cb.(from_telemetry(event_name, metadata)) end,
+      fn event_name, _measurements, metadata, cb ->
+        case from_telemetry(event_name, metadata) do
+          :ignore -> :ok
+          event -> cb.(event)
+        end
+      end,
       callback
     )
   end

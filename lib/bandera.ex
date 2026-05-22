@@ -94,6 +94,9 @@ defmodule Bandera do
   `ratio` is a float in `0.0 < r < 1.0`. The write goes to the persistent store and
   busts/refreshes the cache; returns `{:error, reason}` if the store write fails.
 
+  Pass `by: identity` to record who made the change; it is carried in the write
+  telemetry metadata (see `Bandera.Audit`) and does not affect the gate written.
+
   ## Examples
 
       iex> Bandera.enable(:checkout)
@@ -144,6 +147,8 @@ defmodule Bandera do
   Accepts the same scopes as `enable/2` (`for_actor:`, `for_group:`,
   `for_percentage_of:`). For a percentage scope, disabling for `ratio` is equivalent
   to enabling for `1.0 - ratio`. Returns `{:error, reason}` on a store write failure.
+
+  Accepts `by: identity` to record who made the change (see `Bandera.Audit`).
 
   ## Examples
 
@@ -199,6 +204,8 @@ defmodule Bandera do
     * `for_actor: actor` — clear one actor gate
     * `for_group: group` — clear one group gate
     * `for_percentage: true` — clear the percentage gate
+
+  Accepts `by: identity` to record who made the change (see `Bandera.Audit`).
 
   Returns `{:error, reason}` if the store delete fails.
 

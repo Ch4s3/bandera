@@ -23,7 +23,7 @@ defmodule Bandera.AuditTest do
     :ok
   end
 
-  test "from_telemetry/3 builds an Event from an enable :stop event" do
+  test "from_telemetry/2 builds an Event from an enable :stop event" do
     metadata = %{flag_name: :promo, options: [for_actor: %{id: 7}], result: {:ok, true}}
     event = Audit.from_telemetry([:bandera, :enable, :stop], metadata)
 
@@ -40,6 +40,7 @@ defmodule Bandera.AuditTest do
   test "attach/2 delivers an Event on every write, detach/1 stops it" do
     test_pid = self()
     :ok = Audit.attach(:audit_test, fn event -> send(test_pid, {:audited, event}) end)
+    on_exit(fn -> Audit.detach(:audit_test) end)
 
     {:ok, _} = Bandera.enable(:promo, by: "admin@example.com")
 
