@@ -188,6 +188,23 @@ Bandera emits `:telemetry` events for reads (`[:bandera, :enabled?]`), writes
 (`[:bandera, :enable | :disable | :clear]`), and the persistence layer. Attach
 your own handlers to measure flag usage and store latency.
 
+## Dashboard (optional)
+
+Bandera includes an optional LiveView dashboard to browse and manage flags —
+grouped, searchable, with full per-gate control. It ships in the core library and
+activates only when your app depends on `phoenix_live_view`. It ships no
+JavaScript and needs no asset-pipeline changes — it inherits your layout and runs
+on your existing LiveView socket. Mount it behind your own admin auth:
+
+    import Bandera.Dashboard.Router
+
+    scope "/admin" do
+      pipe_through [:browser, :require_admin]
+      bandera_dashboard "/flags"
+    end
+
+See the [Dashboard guide](guides/dashboard_guide.md) for details.
+
 ## Documentation
 
 Generate docs locally with [ExDoc](https://github.com/elixir-lang/ex_doc):

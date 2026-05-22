@@ -2,6 +2,16 @@ ExUnit.start()
 
 Bandera.Test.start()
 
+case Phoenix.PubSub.Supervisor.start_link(name: Bandera.Dashboard.TestPubSub) do
+  {:ok, _} -> :ok
+  {:error, {:already_started, _}} -> :ok
+end
+
+case Bandera.Dashboard.TestEndpoint.start_link() do
+  {:ok, _} -> :ok
+  {:error, {:already_started, _}} -> :ok
+end
+
 # --- Ecto (SQLite) test repo: fresh DB + schema for the Ecto adapter tests ---
 repo_config = Bandera.TestRepo.config()
 adapter = Ecto.Adapters.SQLite3
