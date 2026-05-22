@@ -16,20 +16,11 @@ defmodule Bandera.MixProject do
       package: package(),
       source_url: @source_url,
       docs: docs(),
-      test_coverage: [
-        summary: [threshold: 85],
-        ignore_modules: [
-          # Router macro: its body expands at compile time, so runtime coverage
-          # always reports 0%. It is exercised via the LiveView mount tests.
-          Bandera.Dashboard.Router,
-          # Test-only scaffolding for the dashboard LiveView tests (not shipped).
-          Bandera.Dashboard.TestEndpoint,
-          Bandera.Dashboard.TestLayouts,
-          Bandera.Dashboard.TestPubSub,
-          Bandera.Dashboard.TestRouter,
-          ~r/\.TestRouter\.Helpers$/
-        ]
-      ],
+      # Coverage runs through ExCoveralls (badge + coveralls.io upload). The 85%
+      # threshold and the excluded files (the compile-time Router macro and the
+      # test-only dashboard scaffolding) live in coveralls.json `skip_files` /
+      # `coverage_options`, since ExCoveralls filters by file path, not module.
+      test_coverage: [tool: ExCoveralls],
       # Incremental Dialyzer via `mix assay`:
       assay: [
         dialyzer: [
@@ -48,6 +39,20 @@ defmodule Bandera.MixProject do
     [
       extra_applications: [:logger, :crypto],
       mod: {Bandera.Application, []}
+    ]
+  end
+
+  # Run the ExCoveralls mix tasks in :test by default (so `mix coveralls` works
+  # locally without a leading `MIX_ENV=test`).
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test,
+        "coveralls.github": :test
+      ]
     ]
   end
 
@@ -147,6 +152,7 @@ defmodule Bandera.MixProject do
       {:stream_data, "~> 1.0", only: :test},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test},
       {:assay, "~> 0.5", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       # Dev-only HTTP server for the local dashboard preview (dev/preview.exs).

@@ -3,6 +3,7 @@
 [![Hex.pm](https://img.shields.io/hexpm/v/bandera.svg)](https://hex.pm/packages/bandera)
 [![HexDocs](https://img.shields.io/badge/hexdocs-documentation-B1A5EE)](https://hexdocs.pm/bandera)
 [![GitHub Actions](https://github.com/ch4s3/bandera/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ch4s3/bandera/actions)
+[![Coverage Status](https://coveralls.io/repos/github/ch4s3/bandera/badge.svg?branch=main)](https://coveralls.io/github/ch4s3/bandera?branch=main)
 
 Feature flags for Elixir, configured **entirely at runtime**, with an
 **async-safe test layer**.

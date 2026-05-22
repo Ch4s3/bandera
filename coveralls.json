@@ -1,0 +1,12 @@
+{
+  "skip_files": [
+    "lib/bandera/dashboard/router.ex",
+    "test/support/dashboard/test_router.ex",
+    "test/support/dashboard/test_layouts.ex",
+    "test/support/dashboard/test_pubsub.ex",
+    "test/support/dashboard/test_endpoint.ex"
+  ],
+  "coverage_options": {
+    "minimum_coverage": 85
+  }
+}

@@ -40,5 +40,12 @@ jobs:
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
       - run: mix credo --strict
-      - run: mix test --cover
+      # Upload coverage to coveralls.io (drives the README badge). This task
+      # posts but does not enforce a threshold.
+      - run: mix coveralls.github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Enforce the 85% gate in-repo (coverage_options.minimum_coverage in
+      # coveralls.json). Fast: the suite runs in well under a second.
+      - run: mix coveralls
       - run: mix assay
