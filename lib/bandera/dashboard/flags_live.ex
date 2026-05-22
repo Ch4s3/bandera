@@ -4,6 +4,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     use Phoenix.LiveView
 
     import Bandera.Dashboard.Components
+    alias Bandera.Dashboard.Theme
 
     @impl true
     def mount(_params, _session, socket) do
@@ -11,7 +12,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       socket =
         socket
-        |> assign(search: "", expanded: MapSet.new(), flash_error: nil)
+        |> assign(
+          search: "",
+          expanded: MapSet.new(),
+          collapsed_groups: MapSet.new(),
+          actor_drafts: %{},
+          group_drafts: %{},
+          theme: Bandera.Config.theme(),
+          flash_error: nil
+        )
         |> load_flags()
 
       {:ok, socket}
@@ -20,15 +29,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @impl true
     def render(assigns) do
       ~H"""
-      <.styles />
-      <div class="bandera-wrap">
-        <h1>Bandera</h1>
+      <.styles theme={@theme} />
+      <div class={Theme.class(@theme, :wrap)}>
+        <h1 class={Theme.class(@theme, :heading)}>Bandera</h1>
 
-        <div :if={@flash_error} class="bandera-flash">{@flash_error}</div>
+        <div :if={@flash_error} class={Theme.class(@theme, :flash)}>{@flash_error}</div>
 
         <form phx-change="search" phx-submit="search">
           <input
-            class="bandera-search"
+            class={Theme.class(@theme, :search)}
             type="text"
             name="q"
             value={@search}
@@ -38,29 +47,44 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           />
         </form>
 
-        <details :for={{group, members} <- @groups} class="bandera-group" open>
-          <summary>{group} <span class="bandera-count">({length(members)})</span></summary>
+        <details
+          :for={{group, members} <- @groups}
+          class={Theme.class(@theme, :group)}
+          open={not group_collapsed?(@collapsed_groups, group)}
+        >
+          <summary
+            class={Theme.class(@theme, :group_summary)}
+            phx-click="toggle_group"
+            phx-value-group={group}
+          >
+            {group} <span class={Theme.class(@theme, :count)}>({length(members)})</span>
+          </summary>
 
           <div :for={{display, flag} <- members}>
-            <div class="bandera-row">
+            <div class={Theme.class(@theme, :row)}>
               <span>
-                <span class="bandera-name">{display}</span>
-                <.state_summary flag={flag} />
+                <span class={Theme.class(@theme, :name)}>{display}</span>
+                <.state_summary flag={flag} theme={@theme} />
               </span>
               <span>
                 <button
                   type="button"
-                  class={["bandera-toggle", !boolean_on?(flag) && "bandera-off"]}
+                  class={Theme.class(@theme, toggle_role(flag))}
                   phx-click="toggle_boolean"
                   phx-value-flag={flag.name}
                 >{if boolean_on?(flag), do: "on", else: "off"}</button>
-                <button type="button" phx-click="toggle_row" phx-value-flag={flag.name}>
+                <button
+                  type="button"
+                  class={Theme.class(@theme, :icon_button)}
+                  phx-click="toggle_row"
+                  phx-value-flag={flag.name}
+                >
                   {if expanded?(@expanded, flag), do: "▴", else: "▾"}
                 </button>
               </span>
             </div>
 
-            <div :if={expanded?(@expanded, flag)} class="bandera-editor">
+            <div :if={expanded?(@expanded, flag)} class={Theme.class(@theme, :editor)}>
               {render_editor(assigns, flag)}
             </div>
           </div>
@@ -85,6 +109,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, socket |> assign(:flash_error, nil) |> assign(:expanded, expanded)}
     end
 
+    def handle_event("toggle_group", %{"group" => group}, socket) do
+      collapsed = socket.assigns.collapsed_groups
+
+      collapsed =
+        if MapSet.member?(collapsed, group),
+          do: MapSet.delete(collapsed, group),
+          else: MapSet.put(collapsed, group)
+
+      {:noreply, assign(socket, :collapsed_groups, collapsed)}
+    end
+
     def handle_event("toggle_boolean", %{"flag" => name}, socket) do
       flag_name = String.to_existing_atom(name)
 
@@ -95,6 +130,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
 
+    def handle_event("actor_input", %{"flag" => name, "actor" => actor}, socket) do
+      {:noreply, update(socket, :actor_drafts, &Map.put(&1, name, actor))}
+    end
+
     def handle_event("add_actor", %{"flag" => name, "actor" => actor}, socket) do
       actor = String.trim(actor)
 
@@ -102,13 +141,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:noreply, assign(socket, :flash_error, "Actor id can't be blank.")}
       else
         Bandera.enable(String.to_existing_atom(name), for_actor: actor)
-        {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
+
+        {:noreply,
+         socket
+         |> assign(:flash_error, nil)
+         |> update(:actor_drafts, &Map.delete(&1, name))
+         |> refresh()}
       end
     end
 
     def handle_event("remove_actor", %{"flag" => name, "actor" => actor}, socket) do
       Bandera.clear(String.to_existing_atom(name), for_actor: actor)
       {:noreply, refresh(socket)}
+    end
+
+    def handle_event("group_input", %{"flag" => name, "group" => group}, socket) do
+      {:noreply, update(socket, :group_drafts, &Map.put(&1, name, group))}
     end
 
     def handle_event("add_group", %{"flag" => name, "group" => group}, socket) do
@@ -118,7 +166,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:noreply, assign(socket, :flash_error, "Group name can't be blank.")}
       else
         Bandera.enable(String.to_existing_atom(name), for_group: group)
-        {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
+
+        {:noreply,
+         socket
+         |> assign(:flash_error, nil)
+         |> update(:group_drafts, &Map.delete(&1, name))
+         |> refresh()}
       end
     end
 
@@ -172,59 +225,83 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       assigns = Phoenix.Component.assign(assigns, :flag, flag)
 
       ~H"""
-      <fieldset>
-        <legend>Actors</legend>
-        <ul class="bandera-gate-list">
-          <li :for={id <- actor_targets(@flag)}>
+      <fieldset class={Theme.class(@theme, :fieldset)}>
+        <legend class={Theme.class(@theme, :legend)}>Actors</legend>
+        <ul class={Theme.class(@theme, :gate_list)}>
+          <li :for={id <- actor_targets(@flag)} class={Theme.class(@theme, :gate_item)}>
             <code>{id}</code>
             <button
               type="button"
-              class="bandera-danger"
+              class={Theme.class(@theme, :danger_button)}
               phx-click="remove_actor"
               phx-value-flag={@flag.name}
               phx-value-actor={id}
             >remove</button>
           </li>
         </ul>
-        <form phx-submit="add_actor">
+        <form phx-submit="add_actor" phx-change="actor_input">
           <input type="hidden" name="flag" value={@flag.name} />
-          <input type="text" name="actor" placeholder="actor id" />
-          <button class="bandera-primary">add actor</button>
+          <input
+            type="text"
+            name="actor"
+            value={Map.get(@actor_drafts, to_string(@flag.name), "")}
+            placeholder="actor id"
+            class={Theme.class(@theme, :input)}
+          />
+          <button class={Theme.class(@theme, :primary_button)}>add actor</button>
         </form>
       </fieldset>
 
-      <fieldset>
-        <legend>Groups</legend>
-        <ul class="bandera-gate-list">
-          <li :for={name <- group_targets(@flag)}>
+      <fieldset class={Theme.class(@theme, :fieldset)}>
+        <legend class={Theme.class(@theme, :legend)}>Groups</legend>
+        <ul class={Theme.class(@theme, :gate_list)}>
+          <li :for={name <- group_targets(@flag)} class={Theme.class(@theme, :gate_item)}>
             <code>{name}</code>
             <button
               type="button"
-              class="bandera-danger"
+              class={Theme.class(@theme, :danger_button)}
               phx-click="remove_group"
               phx-value-flag={@flag.name}
               phx-value-group={name}
             >remove</button>
           </li>
         </ul>
-        <form phx-submit="add_group">
+        <form phx-submit="add_group" phx-change="group_input">
           <input type="hidden" name="flag" value={@flag.name} />
-          <input type="text" name="group" placeholder="group name" />
-          <button class="bandera-primary">add group</button>
+          <input
+            type="text"
+            name="group"
+            value={Map.get(@group_drafts, to_string(@flag.name), "")}
+            placeholder="group name"
+            class={Theme.class(@theme, :input)}
+          />
+          <button class={Theme.class(@theme, :primary_button)}>add group</button>
         </form>
       </fieldset>
 
-      <fieldset>
-        <legend>Percentage</legend>
+      <fieldset class={Theme.class(@theme, :fieldset)}>
+        <legend class={Theme.class(@theme, :legend)}>Percentage</legend>
         <form phx-submit="set_percentage">
           <input type="hidden" name="flag" value={@flag.name} />
-          <input type="number" name="percent" min="1" max="99" placeholder="%" />
-          <select name="kind">
+          <input
+            type="number"
+            name="percent"
+            min="1"
+            max="99"
+            placeholder="%"
+            class={Theme.class(@theme, :input)}
+          />
+          <select name="kind" class={Theme.class(@theme, :select)}>
             <option value="actors">of actors</option>
             <option value="time">of time</option>
           </select>
-          <button class="bandera-primary">set</button>
-          <button type="button" phx-click="clear_percentage" phx-value-flag={@flag.name}>
+          <button class={Theme.class(@theme, :primary_button)}>set</button>
+          <button
+            type="button"
+            class={Theme.class(@theme, :neutral_button)}
+            phx-click="clear_percentage"
+            phx-value-flag={@flag.name}
+          >
             clear
           </button>
         </form>
@@ -232,7 +309,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       <button
         type="button"
-        class="bandera-danger"
+        class={Theme.class(@theme, :danger_button)}
         phx-click="clear_flag"
         phx-value-flag={@flag.name}
       >
@@ -275,6 +352,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp expanded?(expanded, flag), do: MapSet.member?(expanded, to_string(flag.name))
+
+    defp group_collapsed?(collapsed, group), do: MapSet.member?(collapsed, group)
+
+    defp toggle_role(flag), do: if(boolean_on?(flag), do: :toggle_on, else: :toggle_off)
 
     defp actor_targets(flag) do
       for g <- flag.gates, Bandera.Gate.actor?(g), do: g.for

@@ -211,6 +211,90 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
     refute html =~ "invoices"
   end
 
+  test "the add-actor input is cleared after a successful add", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    # The typed draft is reflected back to the field on change...
+    html =
+      live
+      |> form("form[phx-change=actor_input]", %{"flag" => "billing_invoices", "actor" => "user-1"})
+      |> render_change()
+
+    assert html =~ ~s(name="actor" value="user-1")
+
+    # ...and cleared once the add succeeds, ready for the next entry.
+    html = render_submit(live, "add_actor", %{"flag" => "billing_invoices", "actor" => "user-1"})
+    assert html =~ ~s(name="actor" value="")
+    refute html =~ ~s(name="actor" value="user-1")
+  end
+
+  test "a failed add keeps the typed draft so it can be corrected", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    # The user has typed a draft into the group field.
+    _ =
+      live
+      |> form("form[phx-change=group_input]", %{
+        "flag" => "billing_invoices",
+        "group" => "keep-me"
+      })
+      |> render_change()
+
+    # A submission that fails validation must not wipe what they typed.
+    html = render_submit(live, "add_group", %{"flag" => "billing_invoices", "group" => ""})
+    assert html =~ "Group name can"
+    assert html =~ ~s(name="group" value="keep-me")
+  end
+
+  test "a collapsed group stays collapsed across a re-render", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, html} = live(conn, "/flags")
+
+    # Groups start open.
+    assert html =~ ~s(class="bandera-group" open)
+
+    # Collapsing the group drops the `open` attribute.
+    html = render_click(live, "toggle_group", %{"group" => "billing"})
+    refute html =~ ~s(class="bandera-group" open)
+
+    # A later server patch (here, a search keystroke) must not snap it back open.
+    html = render_change(form(live, "form[phx-change=search]"), %{"q" => ""})
+    refute html =~ ~s(class="bandera-group" open)
+    assert html =~ ~s(class="bandera-group">)
+  end
+
+  test "standalone theme (default) inlines the stylesheet and uses bandera- classes", %{
+    conn: conn
+  } do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, _live, html} = live(conn, "/flags")
+
+    assert html =~ "<style"
+    assert html =~ ~s(class="bandera-search")
+    assert html =~ "bandera-row"
+  end
+
+  test "daisyui theme emits daisyUI classes and no inlined stylesheet", %{conn: conn} do
+    Application.put_env(:bandera, :dashboard, group_separator: "_", theme: :daisyui)
+    Bandera.reload_config()
+
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, html} = live(conn, "/flags")
+
+    refute html =~ "<style"
+    refute html =~ "bandera-"
+    assert html =~ "input input-bordered"
+    assert html =~ "rounded-box"
+
+    # The gate editor uses daisyUI classes too.
+    html = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+    assert html =~ "btn btn-primary"
+  end
+
   test "refreshes when another node broadcasts a flag change", %{conn: conn} do
     Application.put_env(:bandera, :cache_bust_notifications,
       enabled: true,

@@ -74,4 +74,22 @@ defmodule Bandera.ConfigTest do
     Config.reload()
     assert Config.group_separator() == nil
   end
+
+  test "theme defaults to :standalone" do
+    Application.delete_env(:bandera, :dashboard)
+    Config.reload()
+    assert Config.theme() == :standalone
+  end
+
+  test "theme can be set to :daisyui" do
+    Application.put_env(:bandera, :dashboard, theme: :daisyui)
+    Config.reload()
+    assert Config.theme() == :daisyui
+  end
+
+  test "an unknown theme falls back to :standalone" do
+    Application.put_env(:bandera, :dashboard, theme: :neon)
+    Config.reload()
+    assert Config.theme() == :standalone
+  end
 end

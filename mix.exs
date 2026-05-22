@@ -51,19 +51,6 @@ defmodule Bandera.MixProject do
     ]
   end
 
-  defp package do
-    [
-      maintainers: ["Chase Gilliam"],
-      licenses: ["MIT"],
-      links: %{
-        "GitHub" => @source_url,
-        "Migration guide" => "#{@source_url}/blob/main/guides/migration_guide.md",
-        "Phoenix LiveView guide" => "#{@source_url}/blob/main/guides/phoenix_liveview_guide.md"
-      },
-      files: ~w(.formatter.exs mix.exs README.md CHANGELOG.md LICENSE.md guides lib)
-    ]
-  end
-
   defp docs do
     [
       main: "readme",
@@ -83,6 +70,12 @@ defmodule Bandera.MixProject do
       "guides/dashboard_guide.md": [title: "Flag Dashboard (LiveView UI)"],
       "guides/migration_guide.md": [title: "Migration from fun_with_flags"],
       "CHANGELOG.md": [title: "Changelog"]
+    ]
+  end
+
+  defp groups_for_extras do
+    [
+      Guides: ~r/guides\/.?/
     ]
   end
 
@@ -110,21 +103,29 @@ defmodule Bandera.MixProject do
         Bandera.Actor,
         Bandera.Group
       ],
-      Testing: [
-        Bandera.Test
-      ],
       Dashboard: [
         Bandera.Dashboard.Router,
         Bandera.Dashboard.FlagsLive,
         Bandera.Dashboard.Components,
-        Bandera.Dashboard.Grouping
+        Bandera.Dashboard.Grouping,
+        Bandera.Dashboard.Theme
+      ],
+      Testing: [
+        Bandera.Test
       ]
     ]
   end
 
-  defp groups_for_extras do
+  defp package do
     [
-      Guides: ~r/guides\/.?/
+      maintainers: ["Chase Gilliam"],
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => @source_url,
+        "Migration guide" => "#{@source_url}/blob/main/guides/migration_guide.md",
+        "Phoenix LiveView guide" => "#{@source_url}/blob/main/guides/phoenix_liveview_guide.md"
+      },
+      files: ~w(.formatter.exs mix.exs README.md CHANGELOG.md LICENSE.md guides lib)
     ]
   end
 
@@ -147,7 +148,9 @@ defmodule Bandera.MixProject do
       {:lazy_html, ">= 0.1.0", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:assay, "~> 0.5", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      # Dev-only HTTP server for the local dashboard preview (dev/preview.exs).
+      {:bandit, "~> 1.0", only: :dev}
     ]
   end
 end
