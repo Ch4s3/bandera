@@ -1,18 +1,17 @@
 defmodule Bandera.Store.Persistent.Ecto.Serializer do
-  @moduledoc """
-  Pure mapping between `Bandera.Gate`s and SQL table rows.
-
-  A row is a plain map `%{flag_name, gate_type, target, enabled}`. Both percentage
-  gate types collapse to `gate_type: "percentage"` (one percentage gate per flag),
-  with the ratio and kind encoded in `target` (`"time/<r>"` / `"actors/<r>"`). The
-  boolean gate's nil target is stored as the `"_bandera_none"` sentinel because SQL
-  unique indexes treat NULL values as distinct.
-
-  Flag names read back from storage are converted to atoms with `String.to_atom/1`
-  (so that listing flags created in a previous VM session works). Feature-flag
-  names must therefore be a bounded, developer-defined set — never untrusted user
-  input.
-  """
+  @moduledoc false
+  # Pure mapping between `Bandera.Gate`s and SQL table rows.
+  #
+  # A row is a plain map `%{flag_name, gate_type, target, enabled}`. Both percentage
+  # gate types collapse to `gate_type: "percentage"` (one percentage gate per flag),
+  # with the ratio and kind encoded in `target` (`"time/<r>"` / `"actors/<r>"`). The
+  # boolean gate's nil target is stored as the `"_bandera_none"` sentinel because SQL
+  # unique indexes treat NULL values as distinct.
+  #
+  # Flag names read back from storage are converted to atoms with `String.to_atom/1`
+  # (so that listing flags created in a previous VM session works). Feature-flag
+  # names must therefore be a bounded, developer-defined set — never untrusted user
+  # input.
 
   alias Bandera.Flag
   alias Bandera.Gate

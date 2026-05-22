@@ -8,8 +8,8 @@ if Code.ensure_loaded?(Redix) do
     start time from `config :bandera, persistence: [redis: <keyword of Redix opts>]`
     — nothing is fixed at compile time.
 
-    Add the connection to your supervision tree (or let `Bandera.Application` start
-    it when the Redis adapter is configured):
+    Add the connection to your supervision tree (or let Bandera's supervision tree
+    start it when the Redis adapter is configured):
 
         config :bandera,
           persistence: [adapter: Bandera.Store.Persistent.Redis, redis: [host: "localhost", port: 6379]]

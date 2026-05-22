@@ -1,14 +1,43 @@
 # Bandera
 
-Feature flags for Elixir, configured **entirely at runtime**.
+[![Hex.pm](https://img.shields.io/hexpm/v/bandera.svg)](https://hex.pm/packages/bandera)
+[![HexDocs](https://img.shields.io/badge/hexdocs-documentation-B1A5EE)](https://hexdocs.pm/bandera)
+[![GitHub Actions](https://github.com/ch4s3/bandera/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ch4s3/bandera/actions)
+
+Feature flags for Elixir, configured **entirely at runtime**, with an
+**async-safe test layer**.
 
 Bandera supports the full gate model — boolean, actor, group, and percentage
-rollouts — and never uses `Application.compile_env/3`. Every setting (cache
-on/off, TTL, persistence adapter, Ecto table name, notifications) is read from
-`Application.get_env/3` and can be changed at runtime, which avoids the
-build/CI recompilation pain of compile-time config. It also ships an
-async-safe, process-scoped test layer so flags can be toggled in `async: true`
-tests without cross-test bleed or sandbox deadlocks.
+rollouts — backed by in-memory, Ecto, or Redis storage, with an ETS cache and
+cross-node cache-busting notifications.
+
+## Why Bandera?
+
+Bandera exists to fix two specific, recurring pain points with feature flags in
+Elixir:
+
+**1. Runtime config — no recompilation.** Most flag libraries read some settings
+through `Application.compile_env/3`, which bakes them into compiled artifacts.
+Changing a value (or even building in a different environment) then forces a
+recompile, which is slow and a frequent source of CI/release surprises. It also
+collides with releases: `mix release` records every `compile_env` value and runs
+a `:validate_compile_env` check at boot, so if `config/runtime.exs` sets a key
+that was read at compile time, the release **refuses to start** with a
+"different value set ... during runtime compared to compile time" error. Bandera
+uses **zero** `compile_env` — every setting (cache on/off, TTL, persistence
+adapter, Ecto table name, notifications) is read from `Application.get_env/3` at
+runtime. There is nothing for `:validate_compile_env` to reject: you can put
+config in `config/runtime.exs`, change it without a recompile, and call
+`Bandera.reload_config/0` to apply it live. Hot-path reads stay fast because the
+resolved config is cached in `:persistent_term`.
+
+**2. Async-safe testing — no global bleed or deadlocks.** Flag state is normally
+global (shared ETS or a database row), so toggling a flag in one test leaks into
+others. That forces flag tests to run `async: false`, and writing flags inside
+the Ecto SQL sandbox can deadlock. Bandera ships a **process-scoped test layer**:
+overrides are scoped to the test process (and its spawned tasks), so tests run
+`async: true` without interfering, never touch the database, and clean up
+automatically when the test process exits. See [Testing](#testing).
 
 ## Installation
 
