@@ -66,7 +66,13 @@ defmodule Bandera.GateTest do
   describe "variant gates" do
     test "new/2 builds a variant gate holding the weights map in :value" do
       gate = Bandera.Gate.new(:variant, %{"blue" => 1, "green" => 1})
-      assert %Bandera.Gate{type: :variant, for: nil, enabled: true, value: %{"blue" => 1, "green" => 1}} = gate
+
+      assert %Bandera.Gate{
+               type: :variant,
+               for: nil,
+               enabled: true,
+               value: %{"blue" => 1, "green" => 1}
+             } = gate
     end
 
     test "variant?/1 and id/1" do

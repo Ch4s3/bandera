@@ -26,9 +26,13 @@ defmodule Bandera.Ecto.MigrationsTest do
     %{columns: columns} =
       Ecto.Adapters.SQL.query!(Bandera.TestRepo, "PRAGMA table_info(bandera_flags)")
 
-    names = Enum.map(Ecto.Adapters.SQL.query!(Bandera.TestRepo, "PRAGMA table_info(bandera_flags)").rows, fn row ->
-      Enum.at(row, 1)
-    end)
+    names =
+      Enum.map(
+        Ecto.Adapters.SQL.query!(Bandera.TestRepo, "PRAGMA table_info(bandera_flags)").rows,
+        fn row ->
+          Enum.at(row, 1)
+        end
+      )
 
     assert "value" in names
     _ = columns
