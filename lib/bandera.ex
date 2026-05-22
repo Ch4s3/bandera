@@ -48,30 +48,26 @@ defmodule Bandera do
 
   def enabled?(flag_name, options) when is_atom(flag_name) do
     {default, rest} = Keyword.pop(options, :default, false)
-    do_enabled?(flag_name, rest, default)
-  end
+    eval_opts = rest |> Keyword.take([:for, :context]) |> drop_nil_for()
 
-  defp do_enabled?(flag_name, [], default) do
     result =
       case Store.active().lookup(flag_name) do
-        {:ok, flag} -> Flag.enabled?(flag)
+        {:ok, flag} -> Flag.enabled?(expand_segments(flag), eval_opts)
         error -> lookup_failed(flag_name, error, default)
       end
 
-    track_enabled?(flag_name, [], result)
+    track_enabled?(flag_name, eval_opts, result)
   end
 
-  defp do_enabled?(flag_name, [for: nil], default), do: do_enabled?(flag_name, [], default)
-
-  defp do_enabled?(flag_name, [for: item], default) do
-    result =
-      case Store.active().lookup(flag_name) do
-        {:ok, flag} -> Flag.enabled?(flag, for: item)
-        error -> lookup_failed(flag_name, error, default)
-      end
-
-    track_enabled?(flag_name, [for: item], result)
+  defp drop_nil_for(opts) do
+    case Keyword.fetch(opts, :for) do
+      {:ok, nil} -> Keyword.delete(opts, :for)
+      _ -> opts
+    end
   end
+
+  # Placeholder — replaced in Task 7 with real segment expansion.
+  defp expand_segments(flag), do: flag
 
   defp track_enabled?(flag_name, options, result) do
     Bandera.Telemetry.event([:enabled?], %{flag_name: flag_name, options: options, result: result})
@@ -138,6 +134,16 @@ defmodule Bandera do
 
   defp do_enable(flag_name, for_percentage_of: {:actors, ratio}) when is_atom(flag_name),
     do: put_constant(flag_name, Gate.new(:percentage_of_actors, ratio), true)
+
+  defp do_enable(flag_name, when: constraints) when is_atom(flag_name) and is_list(constraints) do
+    gate = Gate.new(:rule, Enum.map(constraints, &to_constraint/1), true)
+    put_constant(flag_name, gate, true)
+  end
+
+  defp to_constraint(%Bandera.Constraint{} = c), do: c
+
+  defp to_constraint({attribute, operator, value}),
+    do: Bandera.Constraint.new(attribute, operator, value)
 
   # ---- disable ----
 
