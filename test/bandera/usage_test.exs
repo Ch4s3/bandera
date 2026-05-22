@@ -49,6 +49,14 @@ defmodule Bandera.UsageTest do
     refute :fresh in Bandera.stale_flags(older_than: 30)
   end
 
+  test "stale_flags excludes internal segment definitions" do
+    {:ok, _} = Bandera.put_segment(:premium, [{"plan", :eq, "premium"}])
+
+    refute Enum.any?(Bandera.stale_flags(older_than: 30), fn name ->
+             String.starts_with?(to_string(name), "bandera_segment:")
+           end)
+  end
+
   test "mix bandera.flags --stale prints stale flag names" do
     import ExUnit.CaptureIO
     {:ok, _} = Bandera.enable(:old)

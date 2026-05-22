@@ -8,6 +8,12 @@ defmodule Mix.Tasks.Bandera.Flags do
     {opts, _, _} = OptionParser.parse(args, strict: [stale: :boolean, older_than: :integer])
     Mix.Task.run("app.start")
 
+    if opts[:stale] && is_nil(Process.whereis(Bandera.Usage)) do
+      Mix.shell().info(
+        "[bandera] warning: Bandera.Usage is not running; all flags will appear stale."
+      )
+    end
+
     if opts[:stale] do
       Bandera.stale_flags(older_than: opts[:older_than] || 30)
     else

@@ -89,6 +89,17 @@ defmodule Bandera.GateTest do
       not_yet = Bandera.Gate.new(:schedule, {future, nil})
       assert {:ok, false} = Bandera.Gate.enabled?(not_yet)
     end
+
+    test "a malformed window bound fails closed instead of crashing" do
+      gate = %Bandera.Gate{
+        type: :schedule,
+        for: nil,
+        enabled: true,
+        value: %{"from" => "not-a-date", "until" => nil}
+      }
+
+      assert {:ok, false} = Bandera.Gate.enabled?(gate)
+    end
   end
 
   describe "variant gates" do

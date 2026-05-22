@@ -82,7 +82,12 @@ defmodule Bandera.Gate do
 
   @spec new(:schedule, {String.t() | nil, String.t() | nil}) :: t
   def new(:schedule, {from, until}) do
-    %__MODULE__{type: :schedule, for: nil, enabled: true, value: %{"from" => from, "until" => until}}
+    %__MODULE__{
+      type: :schedule,
+      for: nil,
+      enabled: true,
+      value: %{"from" => from, "until" => until}
+    }
   end
 
   @doc """
@@ -367,11 +372,33 @@ defmodule Bandera.Gate do
     score / 65_536
   end
 
+  # A nil bound is open-ended. A malformed stored bound fails closed (the window is
+  # treated as not-yet-open / already-closed) rather than crashing every evaluation —
+  # schedule values can come from hand-edited or corrupted store rows.
   defp after?(_now, nil), do: true
-  defp after?(now, iso), do: DateTime.compare(now, parse!(iso)) != :lt
+
+  defp after?(now, iso) do
+    case parse(iso) do
+      {:ok, at} -> DateTime.compare(now, at) != :lt
+      :error -> false
+    end
+  end
 
   defp before?(_now, nil), do: true
-  defp before?(now, iso), do: DateTime.compare(now, parse!(iso)) == :lt
 
-  defp parse!(iso), do: iso |> DateTime.from_iso8601() |> elem(1)
+  defp before?(now, iso) do
+    case parse(iso) do
+      {:ok, at} -> DateTime.compare(now, at) == :lt
+      :error -> false
+    end
+  end
+
+  defp parse(iso) when is_binary(iso) do
+    case DateTime.from_iso8601(iso) do
+      {:ok, at, _offset} -> {:ok, at}
+      {:error, _reason} -> :error
+    end
+  end
+
+  defp parse(_iso), do: :error
 end

@@ -30,6 +30,18 @@ defmodule Bandera.PrerequisitesTest do
     assert Bandera.enabled?(:child)
   end
 
+  test "requires: {parent, false} requires the parent to be disabled" do
+    {:ok, _} = Bandera.enable(:child, requires: {:parent, false})
+    {:ok, _} = Bandera.enable(:child)
+
+    # parent absent (disabled) -> prerequisite met
+    assert Bandera.enabled?(:child)
+
+    # parent enabled -> prerequisite not met
+    {:ok, _} = Bandera.enable(:parent)
+    refute Bandera.enabled?(:child)
+  end
+
   test "prerequisite cycles resolve to false instead of looping" do
     {:ok, _} = Bandera.enable(:a, requires: :b)
     {:ok, _} = Bandera.enable(:a)

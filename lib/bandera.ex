@@ -461,7 +461,9 @@ defmodule Bandera do
 
     case all_flag_names() do
       {:ok, names} ->
-        Enum.filter(names, fn name ->
+        names
+        |> Enum.reject(&segment_flag?/1)
+        |> Enum.filter(fn name ->
           case safe_last_evaluated(name) do
             nil -> true
             at -> DateTime.compare(at, cutoff) == :lt
@@ -472,6 +474,10 @@ defmodule Bandera do
         []
     end
   end
+
+  # Internal segment definitions are stored as reserved flags and are never
+  # evaluated via enabled?/2, so they would always look stale — exclude them.
+  defp segment_flag?(name), do: String.starts_with?(to_string(name), @segment_prefix)
 
   # Calls Usage.last_evaluated but returns nil when the Usage table isn't running.
   defp safe_last_evaluated(flag_name) do
