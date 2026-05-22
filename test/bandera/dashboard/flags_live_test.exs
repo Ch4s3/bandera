@@ -147,4 +147,32 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
     refute html =~ "invoices"
     refute Bandera.enabled?(:billing_invoices)
   end
+
+  test "refreshes when another node broadcasts a flag change", %{conn: conn} do
+    Application.put_env(:bandera, :cache_bust_notifications,
+      enabled: true,
+      adapter: Bandera.Notifications.PhoenixPubSub,
+      client: Bandera.Dashboard.TestPubSub
+    )
+
+    Bandera.reload_config()
+
+    on_exit(fn ->
+      Application.delete_env(:bandera, :cache_bust_notifications)
+      Bandera.reload_config()
+    end)
+
+    {:ok, live, html} = live(conn, "/flags")
+    refute html =~ "promo_banner"
+
+    {:ok, true} = Bandera.enable(:promo_banner)
+
+    Phoenix.PubSub.broadcast(
+      Bandera.Dashboard.TestPubSub,
+      "bandera:changes",
+      {:bandera_change, :promo_banner, "other-node"}
+    )
+
+    assert render(live) =~ "promo_banner"
+  end
 end

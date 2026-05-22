@@ -7,6 +7,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @impl true
     def mount(_params, _session, socket) do
+      if connected?(socket), do: subscribe_to_changes()
+
       socket =
         socket
         |> assign(search: "", expanded: MapSet.new(), flash_error: nil)
@@ -157,6 +159,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
        |> refresh()}
     end
 
+    @impl true
+    def handle_info({:bandera_change, _flag, _id}, socket) do
+      {:noreply, refresh(socket)}
+    end
+
+    def handle_info(_msg, socket), do: {:noreply, socket}
+
     # ---- editor (inline; extract into Components later if it grows) ----
 
     defp render_editor(assigns, flag) do
@@ -282,6 +291,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp refresh(socket), do: load_flags(socket)
+
+    @change_topic "bandera:changes"
+
+    defp subscribe_to_changes do
+      with true <- Bandera.Config.notifications_adapter() == Bandera.Notifications.PhoenixPubSub,
+           client when not is_nil(client) <- Keyword.get(Bandera.Config.notifications(), :client) do
+        Phoenix.PubSub.subscribe(client, @change_topic)
+      else
+        _ -> :ok
+      end
+    end
 
     defp percentage_kind("actors"), do: {:ok, :actors}
     defp percentage_kind("time"), do: {:ok, :time}
