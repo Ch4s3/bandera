@@ -52,8 +52,15 @@ defmodule Bandera do
 
     result =
       case Store.active().lookup(flag_name) do
-        {:ok, flag} -> Flag.enabled?(expand_segments(flag), eval_opts)
-        error -> lookup_failed(flag_name, error, default)
+        {:ok, flag} ->
+          if prerequisites_met?(flag, eval_opts, [flag_name]) do
+            Flag.enabled?(expand_segments(flag), eval_opts)
+          else
+            false
+          end
+
+        error ->
+          lookup_failed(flag_name, error, default)
       end
 
     track_enabled?(flag_name, eval_opts, result)
@@ -165,6 +172,13 @@ defmodule Bandera do
 
   defp do_enable(flag_name, for_segment: name) when is_atom(flag_name),
     do: put_constant(flag_name, Gate.new(:segment, name, true), true)
+
+  defp do_enable(flag_name, requires: parent) when is_atom(flag_name) and is_atom(parent),
+    do: put_constant(flag_name, Gate.new(:prerequisite, parent, true), true)
+
+  defp do_enable(flag_name, requires: {parent, required})
+       when is_atom(flag_name) and is_atom(parent) and is_boolean(required),
+       do: put_constant(flag_name, Gate.new(:prerequisite, parent, required), true)
 
   defp to_constraint(%Bandera.Constraint{} = c), do: c
 
@@ -430,6 +444,29 @@ defmodule Bandera do
     case Store.active().delete(flag_name, gate) do
       {:ok, _flag} -> :ok
       error -> error
+    end
+  end
+
+  defp prerequisites_met?(%Flag{gates: gates}, eval_opts, visited) do
+    gates
+    |> Enum.filter(&Gate.prerequisite?/1)
+    |> Enum.all?(fn %Gate{for: parent, enabled: required} ->
+      cond do
+        parent in visited -> false
+        true -> enabled_within?(parent, eval_opts, visited) == required
+      end
+    end)
+  end
+
+  # Like enabled?/2 but carries the visited set for cycle detection.
+  defp enabled_within?(flag_name, eval_opts, visited) do
+    case Store.active().lookup(flag_name) do
+      {:ok, flag} ->
+        prerequisites_met?(flag, eval_opts, [flag_name | visited]) and
+          Flag.enabled?(expand_segments(flag), eval_opts)
+
+      _ ->
+        false
     end
   end
 
