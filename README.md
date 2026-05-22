@@ -182,6 +182,51 @@ end
 
 Overrides are cleaned up automatically when the test process exits.
 
+## Fail-open default
+
+By default `enabled?/2` returns `false` when the store is unreachable (the
+error is logged). Pass `default: true` to fail open instead:
+
+```elixir
+# Returns true if the store is down, false if the flag is simply off.
+Bandera.enabled?(:checkout, default: true)
+
+# Works with per-actor checks too.
+Bandera.enabled?(:beta, for: current_user, default: true)
+```
+
+## Audit log
+
+Bandera includes an opt-in audit hook that turns the built-in write telemetry
+into structured change events. Attach it once at startup with a callback:
+
+```elixir
+# In your application start/2 or a supervision child:
+Bandera.Audit.attach(:my_audit, fn event ->
+  MyApp.AuditLog.insert!(%{
+    action: event.action,
+    flag: event.flag_name,
+    actor: event.actor,
+    at: event.at
+  })
+end)
+```
+
+The callback receives a `%Bandera.Audit.Event{}` on every `enable/2`,
+`disable/2`, or `clear/2` call. Pass `:by` to the write functions to record
+who made the change:
+
+```elixir
+Bandera.enable(:checkout, by: current_user.email)
+Bandera.disable(:beta, for_actor: %{id: 1}, by: "admin@example.com")
+```
+
+Call `Bandera.Audit.detach/1` with the same handler id to stop receiving events:
+
+```elixir
+Bandera.Audit.detach(:my_audit)
+```
+
 ## Telemetry
 
 Bandera emits `:telemetry` events for reads (`[:bandera, :enabled?]`), writes
