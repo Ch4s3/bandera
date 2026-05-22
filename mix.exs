@@ -144,7 +144,6 @@ defmodule Bandera.MixProject do
       {:phoenix_live_view, "~> 1.0", optional: true},
       {:ecto_sqlite3, "~> 0.17", only: :test},
       {:stream_data, "~> 1.0", only: :test},
-      {:jason, "~> 1.0", only: [:dev, :test]},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:assay, "~> 0.5", only: [:dev, :test], runtime: false},

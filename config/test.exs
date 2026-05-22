@@ -14,4 +14,4 @@ config :bandera, Bandera.Dashboard.TestEndpoint,
   check_origin: false,
   server: false
 
-config :phoenix, :json_library, Jason
+config :phoenix, :json_library, JSON
