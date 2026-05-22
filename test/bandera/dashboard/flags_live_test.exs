@@ -32,4 +32,19 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
     {:ok, _live, html} = live(conn, "/flags")
     assert html =~ "Bandera"
   end
+
+  test "renders flags grouped by name prefix", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, true} = Bandera.enable(:billing_checkout, for_percentage_of: {:actors, 0.25})
+    {:ok, true} = Bandera.enable(:beta)
+
+    {:ok, _live, html} = live(conn, "/flags")
+
+    assert html =~ "billing"
+    assert html =~ "invoices"
+    assert html =~ "checkout"
+    assert html =~ "25% of actors"
+    assert html =~ "Ungrouped"
+    assert html =~ "beta"
+  end
 end
