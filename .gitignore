@@ -13,3 +13,5 @@ bandera-*.tar
 # SQLite test database
 /bandera_test.db
 /bandera_test.db-*
+
+.dexter

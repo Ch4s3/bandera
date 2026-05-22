@@ -1,17 +1,21 @@
 defmodule Bandera.MixProject do
   use Mix.Project
+
+  @version "0.1.0"
   @source_url "https://github.com/ch4s3/bandera"
 
   def project do
     [
       app: :bandera,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: "Feature flag library with runtime config for storage backends and caching.",
       package: package(),
+      source_url: @source_url,
+      docs: docs(),
       test_coverage: [summary: [threshold: 85]],
       # Incremental Dialyzer via `mix assay`:
       assay: [
@@ -39,9 +43,68 @@ defmodule Bandera.MixProject do
       maintainers: ["Chase Gilliam"],
       licenses: ["MIT"],
       links: %{
-        "GitHub" => @source_url
+        "GitHub" => @source_url,
+        "Migration guide" => "#{@source_url}/blob/main/guides/migration_guide.md",
+        "Phoenix LiveView guide" => "#{@source_url}/blob/main/guides/phoenix_liveview_guide.md"
       },
-      files: ~w(.formatter.exs mix.exs README.md lib)
+      files: ~w(.formatter.exs mix.exs README.md CHANGELOG.md LICENSE.md guides lib)
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      source_ref: "v#{@version}",
+      source_url: @source_url,
+      extra_section: "GUIDES",
+      extras: extras(),
+      groups_for_extras: groups_for_extras(),
+      groups_for_modules: groups_for_modules()
+    ]
+  end
+
+  defp extras do
+    [
+      "README.md",
+      "guides/phoenix_liveview_guide.md": [title: "Using Bandera with Phoenix LiveView"],
+      "guides/migration_guide.md": [title: "Migration from fun_with_flags"],
+      "CHANGELOG.md": [title: "Changelog"]
+    ]
+  end
+
+  defp groups_for_modules do
+    [
+      Stores: [
+        Bandera.Store,
+        Bandera.Store.TwoLevel,
+        Bandera.Store.ProcessScoped,
+        Bandera.Store.Cache
+      ],
+      Persistence: [
+        Bandera.Store.Persistent,
+        Bandera.Store.Persistent.Memory,
+        Bandera.Store.Persistent.Ecto,
+        Bandera.Store.Persistent.Redis,
+        Bandera.Ecto.Migrations
+      ],
+      Notifications: [
+        Bandera.Notifications,
+        Bandera.Notifications.Redis,
+        Bandera.Notifications.PhoenixPubSub
+      ],
+      Protocols: [
+        Bandera.Actor,
+        Bandera.Group
+      ],
+      Testing: [
+        Bandera.Test
+      ]
+    ]
+  end
+
+  defp groups_for_extras do
+    [
+      Guides: ~r/guides\/.?/
     ]
   end
 

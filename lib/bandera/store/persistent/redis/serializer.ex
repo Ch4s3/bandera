@@ -1,16 +1,15 @@
 defmodule Bandera.Store.Persistent.Redis.Serializer do
-  @moduledoc """
-  Pure mapping between `Bandera.Gate`s and Redis hash `{field, value}` pairs.
-
-  The hash field is the gate id (`Bandera.Gate.id/1`), so both percentage gate
-  types share the `"percentage"` field (one percentage gate per flag — an HSET
-  overwrites it). The value encodes `"true"`/`"false"` for boolean/actor/group, or
-  `"time/<ratio>"`/`"actors/<ratio>"` for percentage gates.
-
-  Flag names read back are converted to atoms via `String.to_atom/1` (supporting
-  listing flags created in a prior VM session). Flag names must therefore be a
-  bounded, developer-defined set — never untrusted user input.
-  """
+  @moduledoc false
+  # Pure mapping between `Bandera.Gate`s and Redis hash `{field, value}` pairs.
+  #
+  # The hash field is the gate id (`Bandera.Gate.id/1`), so both percentage gate
+  # types share the `"percentage"` field (one percentage gate per flag — an HSET
+  # overwrites it). The value encodes `"true"`/`"false"` for boolean/actor/group, or
+  # `"time/<ratio>"`/`"actors/<ratio>"` for percentage gates.
+  #
+  # Flag names read back are converted to atoms via `String.to_atom/1` (supporting
+  # listing flags created in a prior VM session). Flag names must therefore be a
+  # bounded, developer-defined set — never untrusted user input.
 
   alias Bandera.Flag
   alias Bandera.Gate
