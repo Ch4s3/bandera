@@ -187,6 +187,24 @@ defmodule BanderaTest do
     assert {:ok, %Bandera.Flag{name: :f, gates: []}} = Bandera.get_flag(:f)
   end
 
+  test "enable/2 carries :by into the :enable telemetry metadata" do
+    test_pid = self()
+    handler = {:by_test, make_ref()}
+
+    :telemetry.attach(
+      handler,
+      [:bandera, :enable, :stop],
+      fn _e, _m, metadata, _ -> send(test_pid, {:meta, metadata}) end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    {:ok, _} = Bandera.enable(:f, by: "alice")
+    assert_receive {:meta, %{options: options}}
+    assert Keyword.get(options, :by) == "alice"
+  end
+
   describe "store errors propagate (FailingStore)" do
     setup do
       Application.put_env(:bandera, :store, Bandera.FailingStore)

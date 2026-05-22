@@ -109,8 +109,10 @@ defmodule Bandera do
   def enable(flag_name, options \\ [])
 
   def enable(flag_name, options) when is_atom(flag_name) do
+    {_by, rest} = Keyword.pop(options, :by)
+
     Bandera.Telemetry.span([:enable], %{flag_name: flag_name, options: options}, fn ->
-      result = do_enable(flag_name, options)
+      result = do_enable(flag_name, rest)
       {result, %{result: result}}
     end)
   end
@@ -156,8 +158,10 @@ defmodule Bandera do
   def disable(flag_name, options \\ [])
 
   def disable(flag_name, options) when is_atom(flag_name) do
+    {_by, rest} = Keyword.pop(options, :by)
+
     Bandera.Telemetry.span([:disable], %{flag_name: flag_name, options: options}, fn ->
-      result = do_disable(flag_name, options)
+      result = do_disable(flag_name, rest)
       {result, %{result: result}}
     end)
   end
@@ -210,8 +214,10 @@ defmodule Bandera do
   def clear(flag_name, options \\ [])
 
   def clear(flag_name, options) when is_atom(flag_name) do
+    {_by, rest} = Keyword.pop(options, :by)
+
     Bandera.Telemetry.span([:clear], %{flag_name: flag_name, options: options}, fn ->
-      result = do_clear(flag_name, options)
+      result = do_clear(flag_name, rest)
       {result, %{result: result}}
     end)
   end
