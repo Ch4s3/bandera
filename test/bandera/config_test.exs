@@ -56,4 +56,22 @@ defmodule Bandera.ConfigTest do
     assert a != b
     assert String.length(a) == 16
   end
+
+  test "group_separator defaults to \"_\"" do
+    Application.delete_env(:bandera, :dashboard)
+    Config.reload()
+    assert Config.group_separator() == "_"
+  end
+
+  test "group_separator can be overridden to \"/\"" do
+    Application.put_env(:bandera, :dashboard, group_separator: "/")
+    Config.reload()
+    assert Config.group_separator() == "/"
+  end
+
+  test "group_separator can be overridden to nil" do
+    Application.put_env(:bandera, :dashboard, group_separator: nil)
+    Config.reload()
+    assert Config.group_separator() == nil
+  end
 end

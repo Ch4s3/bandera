@@ -14,6 +14,7 @@ defmodule Bandera.Config do
   @default_persistence [adapter: Bandera.Store.Persistent.Memory]
   @default_store Bandera.Store.TwoLevel
   @default_notifications [enabled: false, adapter: Bandera.Notifications.Redis]
+  @default_dashboard [group_separator: "_"]
 
   @type snapshot :: %{
           store: module,
@@ -23,7 +24,8 @@ defmodule Bandera.Config do
           persistence: keyword,
           notifications_enabled?: boolean,
           notifications_adapter: module,
-          notifications: keyword
+          notifications: keyword,
+          group_separator: String.t() | nil
         }
 
   @doc "Re-read application env and rewrite the persistent_term snapshot."
@@ -84,6 +86,10 @@ defmodule Bandera.Config do
   @spec notifications() :: keyword
   def notifications, do: snapshot().notifications
 
+  @doc "The dashboard's flag-grouping separator (default `\"_\"`; `nil` disables grouping)."
+  @spec group_separator() :: String.t() | nil
+  def group_separator, do: snapshot().group_separator
+
   @doc "Generate a random per-node id used to ignore self-published change notifications."
   @spec build_unique_id() :: String.t()
   def build_unique_id, do: 8 |> :crypto.strong_rand_bytes() |> Base.encode16(case: :lower)
@@ -100,6 +106,9 @@ defmodule Bandera.Config do
         Application.get_env(:bandera, :cache_bust_notifications, [])
       )
 
+    dashboard =
+      Keyword.merge(@default_dashboard, Application.get_env(:bandera, :dashboard, []))
+
     %{
       store: Application.get_env(:bandera, :store, @default_store),
       cache_enabled?: Keyword.fetch!(cache, :enabled),
@@ -108,7 +117,8 @@ defmodule Bandera.Config do
       persistence: persistence,
       notifications_enabled?: Keyword.fetch!(notifications, :enabled),
       notifications_adapter: Keyword.fetch!(notifications, :adapter),
-      notifications: notifications
+      notifications: notifications,
+      group_separator: Keyword.fetch!(dashboard, :group_separator)
     }
   end
 end
