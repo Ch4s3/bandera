@@ -64,6 +64,51 @@ defmodule Bandera.Flag do
     end
   end
 
+  @doc """
+  Resolves the flag to one of its named variations for the given actor.
+
+  Returns the `:default` option (`nil` when unset) unless the flag has a `:variant`
+  gate *and* a `:for` actor is given — a variant has no meaning without a stable
+  bucket. Allocation is sticky: the same actor and flag always land in the same
+  variant, via the SHA-256 `Bandera.Gate.score/2`.
+
+  ## Examples
+
+      iex> flag = Bandera.Flag.new(:f, [Bandera.Gate.new(:variant, %{"only" => 1, "never" => 0})])
+      iex> Bandera.Flag.variant(flag, for: %{id: 99})
+      "only"
+
+      iex> Bandera.Flag.variant(Bandera.Flag.new(:f), for: %{id: 1}, default: "control")
+      "control"
+  """
+  @spec variant(t, keyword) :: term
+  def variant(%__MODULE__{gates: gates, name: name}, options \\ []) do
+    default = Keyword.get(options, :default)
+
+    with %Gate{value: weights} <- Enum.find(gates, &Gate.variant?/1),
+         {:ok, actor} when not is_nil(actor) <- Keyword.fetch(options, :for) do
+      allocate(weights, Gate.score(actor, name))
+    else
+      _ -> default
+    end
+  end
+
+  # Walks variants in name order accumulating weight; the actor's score (scaled to
+  # the total weight) selects the bucket. The `{acc, name}` accumulator guarantees
+  # the last weighted variant is returned even if float rounding leaves `pick`
+  # exactly at the top of the range.
+  defp allocate(weights, score) do
+    total = weights |> Map.values() |> Enum.sum()
+    pick = score * total
+    sorted = Enum.sort_by(weights, fn {name, _w} -> name end)
+
+    Enum.reduce_while(sorted, {0.0, nil}, fn {name, weight}, {acc, _last} ->
+      acc = acc + weight
+      if pick < acc, do: {:halt, {acc, name}}, else: {:cont, {acc, name}}
+    end)
+    |> elem(1)
+  end
+
   defp check_actor_gates(gates, item) do
     gates
     |> Enum.filter(&Gate.actor?/1)
