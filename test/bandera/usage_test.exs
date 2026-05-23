@@ -65,4 +65,14 @@ defmodule Bandera.UsageTest do
     assert :old in Bandera.stale_flags(older_than: 30)
     refute :fresh in Bandera.stale_flags(older_than: 30)
   end
+
+  test "mix bandera.flags --stale prints stale flag names" do
+    import ExUnit.CaptureIO
+
+    {:ok, _} = Bandera.enable(:old)
+    :ets.insert(Usage, {:old, DateTime.add(DateTime.utc_now(), -100, :day)})
+
+    output = capture_io(fn -> Mix.Tasks.Bandera.Flags.run(["--stale", "--older-than", "30"]) end)
+    assert output =~ "old"
+  end
 end
