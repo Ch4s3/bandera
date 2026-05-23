@@ -22,7 +22,8 @@ defmodule Bandera.Store.Persistent.Ecto.Serializer do
           flag_name: String.t(),
           gate_type: String.t(),
           target: String.t(),
-          enabled: boolean
+          enabled: boolean,
+          value: String.t() | nil
         }
 
   @doc """
@@ -50,7 +51,8 @@ defmodule Bandera.Store.Persistent.Ecto.Serializer do
       flag_name: to_string(flag_name),
       gate_type: gate_type,
       target: target,
-      enabled: gate.enabled
+      enabled: gate.enabled,
+      value: encode_value(gate)
     }
   end
 
@@ -109,8 +111,13 @@ defmodule Bandera.Store.Persistent.Ecto.Serializer do
 
   defp type_and_target(%Gate{type: :boolean}), do: {"boolean", @none}
 
+  defp type_and_target(%Gate{type: :variant}), do: {"variant", @none}
+
   defp type_and_target(%Gate{type: type, for: target}),
     do: {to_string(type), serialize_target(target)}
+
+  defp encode_value(%Gate{type: :variant, value: weights}), do: Jason.encode!(weights)
+  defp encode_value(%Gate{}), do: nil
 
   defp to_gate(%{gate_type: "boolean", enabled: enabled}),
     do: %Gate{type: :boolean, for: nil, enabled: enabled}
@@ -120,6 +127,9 @@ defmodule Bandera.Store.Persistent.Ecto.Serializer do
 
   defp to_gate(%{gate_type: "group", target: target, enabled: enabled}),
     do: %Gate{type: :group, for: target, enabled: enabled}
+
+  defp to_gate(%{gate_type: "variant", value: value}),
+    do: %Gate{type: :variant, for: nil, enabled: true, value: Jason.decode!(value)}
 
   defp to_gate(%{gate_type: "percentage", target: "time/" <> ratio}),
     do: %Gate{type: :percentage_of_time, for: String.to_float(ratio), enabled: true}

@@ -78,7 +78,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       row = Serializer.to_row(flag_name, gate)
 
       repo().insert_all({table(), Record}, [row],
-        on_conflict: {:replace, [:enabled]},
+        on_conflict: {:replace, [:enabled, :value]},
         conflict_target: [:flag_name, :gate_type, :target]
       )
 

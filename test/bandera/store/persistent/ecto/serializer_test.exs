@@ -68,4 +68,23 @@ defmodule Bandera.Store.Persistent.Ecto.SerializerTest do
     assert Serializer.serialize_target("x") == "x"
     assert Serializer.serialize_target(:y) == "y"
   end
+
+  describe "variant gates (schema v2 value)" do
+    test "to_row encodes weights as JSON in :value" do
+      row = Serializer.to_row(:f, Gate.new(:variant, %{"a" => 1, "b" => 2}))
+      assert row.gate_type == "variant"
+      assert row.target == "_bandera_none"
+      assert Jason.decode!(row.value) == %{"a" => 1, "b" => 2}
+    end
+
+    test "round-trips a variant gate" do
+      gate = Gate.new(:variant, %{"a" => 1, "b" => 2})
+      row = Serializer.to_row(:f, gate)
+      assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [row])
+    end
+
+    test "non-variant gates carry value: nil" do
+      assert %{value: nil} = Serializer.to_row(:f, Gate.new(:boolean, true))
+    end
+  end
 end
