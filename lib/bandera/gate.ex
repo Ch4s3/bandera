@@ -4,12 +4,14 @@ defmodule Bandera.Gate do
   alias Bandera.Actor
   alias Bandera.Group
 
-  defstruct [:type, :for, :enabled]
+  defstruct [:type, :for, :enabled, :value]
 
   @type t :: %__MODULE__{
-          type: :boolean | :actor | :group | :percentage_of_time | :percentage_of_actors,
+          type:
+            :boolean | :actor | :group | :percentage_of_time | :percentage_of_actors | :variant,
           for: term,
-          enabled: boolean
+          enabled: boolean,
+          value: term
         }
 
   defmodule InvalidTargetError do
@@ -52,6 +54,15 @@ defmodule Bandera.Gate do
 
   def new(type, _ratio) when type in [:percentage_of_time, :percentage_of_actors] do
     raise InvalidTargetError, "#{type} gates require a ratio in the range 0.0 < r < 1.0"
+  end
+
+  @spec new(:variant, %{optional(String.t()) => number}) :: t
+  def new(:variant, weights) when is_map(weights) and map_size(weights) > 0 do
+    %__MODULE__{type: :variant, for: nil, enabled: true, value: weights}
+  end
+
+  def new(:variant, _weights) do
+    raise InvalidTargetError, "variant gates require a non-empty %{name => weight} map"
   end
 
   @doc """
@@ -154,6 +165,21 @@ defmodule Bandera.Gate do
   def percentage_of_actors?(%__MODULE__{}), do: false
 
   @doc """
+  Returns `true` if the gate is a `:variant` gate.
+
+  ## Examples
+
+      iex> Bandera.Gate.variant?(Bandera.Gate.new(:variant, %{"a" => 1}))
+      true
+
+      iex> Bandera.Gate.variant?(Bandera.Gate.new(:boolean, true))
+      false
+  """
+  @spec variant?(t) :: boolean
+  def variant?(%__MODULE__{type: :variant}), do: true
+  def variant?(%__MODULE__{}), do: false
+
+  @doc """
   Returns the gate's storage id, used as the per-flag slot key.
 
   Both percentage gate types collapse to `"percentage"` (a flag holds at most one
@@ -176,6 +202,7 @@ defmodule Bandera.Gate do
   def id(%__MODULE__{type: :group, for: group}), do: "group/#{group}"
   def id(%__MODULE__{type: :percentage_of_time}), do: "percentage"
   def id(%__MODULE__{type: :percentage_of_actors}), do: "percentage"
+  def id(%__MODULE__{type: :variant}), do: "variant"
 
   @doc """
   Evaluates a single gate against `options`.

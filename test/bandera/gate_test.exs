@@ -62,4 +62,24 @@ defmodule Bandera.GateTest do
     assert {:ok, value} = Gate.enabled?(gate)
     assert is_boolean(value)
   end
+
+  describe "variant gates" do
+    test "new/2 builds a variant gate holding the weights map in :value" do
+      gate = Gate.new(:variant, %{"blue" => 1, "green" => 1})
+
+      assert %Gate{type: :variant, for: nil, enabled: true, value: %{"blue" => 1, "green" => 1}} =
+               gate
+    end
+
+    test "variant?/1 and id/1" do
+      gate = Gate.new(:variant, %{"a" => 1})
+      assert Gate.variant?(gate)
+      refute Gate.variant?(Gate.new(:boolean, true))
+      assert Gate.id(gate) == "variant"
+    end
+
+    test "new/2 rejects an empty weights map" do
+      assert_raise Gate.InvalidTargetError, fn -> Gate.new(:variant, %{}) end
+    end
+  end
 end
