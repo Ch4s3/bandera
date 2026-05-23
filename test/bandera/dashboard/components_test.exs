@@ -2,6 +2,7 @@ defmodule Bandera.Dashboard.ComponentsTest do
   use ExUnit.Case, async: true
   import Phoenix.LiveViewTest
 
+  alias Bandera.Constraint
   alias Bandera.Dashboard.Components
   alias Bandera.Flag
   alias Bandera.Gate
@@ -41,6 +42,49 @@ defmodule Bandera.Dashboard.ComponentsTest do
     out = summary([Gate.new(:boolean, false), Gate.new(:actor, "u1", true)])
     assert out =~ "off"
     assert out =~ "1 actor"
+    assert out =~ "·"
+  end
+
+  test "variant weights" do
+    out = summary([Gate.new(:variant, %{"blue" => 1, "green" => 1})])
+    assert out =~ "variants blue 50%, green 50%"
+  end
+
+  test "rule constraint count" do
+    c = Constraint.new("plan", :eq, "pro")
+    assert summary([Gate.new(:rule, [c], true)]) =~ "rule (1 constraint)"
+    assert summary([Gate.new(:rule, [c, c], true)]) =~ "rule (2 constraints)"
+  end
+
+  test "counts segment and prerequisite gates" do
+    out =
+      summary([
+        Gate.new(:segment, "premium", true),
+        Gate.new(:segment, "beta", true),
+        Gate.new(:prerequisite, :billing, true)
+      ])
+
+    assert out =~ "2 segments"
+    assert out =~ "1 prerequisite"
+  end
+
+  test "schedule window, open-ended on either side" do
+    assert summary([Gate.new(:schedule, {"2026-01-01T00:00:00Z", "2026-06-01T00:00:00Z"})]) =~
+             "scheduled 2026-01-01T00:00:00Z → 2026-06-01T00:00:00Z"
+
+    assert summary([Gate.new(:schedule, {"2026-01-01T00:00:00Z", nil})]) =~
+             "scheduled from 2026-01-01T00:00:00Z"
+
+    assert summary([Gate.new(:schedule, {nil, "2026-06-01T00:00:00Z"})]) =~
+             "scheduled until 2026-06-01T00:00:00Z"
+
+    assert summary([Gate.new(:schedule, {nil, nil})]) =~ "scheduled"
+  end
+
+  test "combines a new gate part with the separator" do
+    out = summary([Gate.new(:boolean, false), Gate.new(:segment, "premium", true)])
+    assert out =~ "off"
+    assert out =~ "1 segment"
     assert out =~ "·"
   end
 

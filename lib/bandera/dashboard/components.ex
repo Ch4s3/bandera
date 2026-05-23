@@ -194,7 +194,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         boolean_part(gates),
         percentage_part(gates),
         count_part(gates, &Gate.actor?/1, "actor"),
-        count_part(gates, &Gate.group?/1, "group")
+        count_part(gates, &Gate.group?/1, "group"),
+        variant_part(gates),
+        rule_part(gates),
+        count_part(gates, &Gate.segment?/1, "segment"),
+        count_part(gates, &Gate.prerequisite?/1, "prerequisite"),
+        schedule_part(gates)
       ]
       |> Enum.reject(&is_nil/1)
     end
@@ -217,6 +222,50 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         true ->
           nil
+      end
+    end
+
+    defp variant_part(gates) do
+      case Enum.find(gates, &Gate.variant?/1) do
+        nil ->
+          nil
+
+        %Gate{value: weights} ->
+          total = weights |> Map.values() |> Enum.sum()
+
+          parts =
+            weights
+            |> Enum.sort_by(fn {name, _w} -> name end)
+            |> Enum.map_join(", ", fn {name, w} -> "#{name} #{percent(w / total)}%" end)
+
+          "variants " <> parts
+      end
+    end
+
+    defp rule_part(gates) do
+      case Enum.find(gates, &Gate.rule?/1) do
+        nil ->
+          nil
+
+        %Gate{value: constraints} ->
+          n = length(constraints)
+          noun = if n == 1, do: "constraint", else: "constraints"
+          "rule (#{n} #{noun})"
+      end
+    end
+
+    defp schedule_part(gates) do
+      case Enum.find(gates, &Gate.schedule?/1) do
+        nil ->
+          nil
+
+        %Gate{value: %{"from" => from, "until" => until}} ->
+          cond do
+            from && until -> "scheduled #{from} → #{until}"
+            from -> "scheduled from #{from}"
+            until -> "scheduled until #{until}"
+            true -> "scheduled"
+          end
       end
     end
 
