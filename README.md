@@ -150,6 +150,27 @@ defimpl Bandera.Group, for: MyApp.User do
 end
 ```
 
+### Multivariate flags
+
+Beyond on/off, a flag can resolve to one of several named variations. Store a
+`%{name => weight}` map and each actor is bucketed into a stable variant (the same
+actor + flag always lands in the same variation, via the SHA-256 score):
+
+```elixir
+Bandera.put_variants(:hero_cta, %{"blue" => 1, "green" => 1})
+
+Bandera.variant(:hero_cta, for: current_user)              #=> "blue" (sticky per actor)
+Bandera.variant(:unset, for: current_user, default: "a")   #=> "a"   (no variant gate)
+```
+
+`variant/2` returns the `:default` option (`nil` when unset) when the flag has no
+variant gate or no `:for` actor is given. Weights are relative, so `%{"a" => 3,
+"b" => 1}` rolls out roughly 75/25.
+
+> **Upgrading an existing Ecto install:** variant weights are stored in a `value`
+> column added in schema v2. Run `Bandera.Ecto.Migrations.upgrade_v2/0` from a
+> migration to add it to an existing flags table.
+
 ## Testing
 
 Bandera's test layer scopes flag overrides to the test process (and its

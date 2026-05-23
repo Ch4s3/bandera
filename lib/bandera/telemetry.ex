@@ -8,6 +8,8 @@ defmodule Bandera.Telemetry do
   ## Point-in-time events (measurement: `%{system_time}`)
 
   * `[:bandera, :enabled?]` — a flag was checked. Metadata: `%{flag_name, options, result}`.
+  * `[:bandera, :variant]` — a flag was resolved to a variation. Metadata:
+    `%{flag_name, options, result}`.
   * `[:bandera, :persistence, :get]` — a flag was read from the persistent
     adapter. Emitted ONLY on a cache miss (a cache hit does not read the
     adapter). Metadata: `%{flag_name}`.
@@ -21,6 +23,8 @@ defmodule Bandera.Telemetry do
 
   * `[:bandera, :enable]`, `[:bandera, :disable]`, `[:bandera, :clear]` — public
     API writes. Start metadata `%{flag_name, options}`; stop metadata `%{result}`.
+  * `[:bandera, :put_variants]` — a variant gate was written. Start metadata
+    `%{flag_name, weights}`; stop metadata `%{result}`.
   * `[:bandera, :persistence, :put]`, `[:bandera, :persistence, :delete]` — store
     writes. Start metadata `%{flag_name, gate}` (gate where applicable).
   * `[:bandera, :persistence, :all_flags]`, `[:bandera, :persistence, :all_flag_names]`.
