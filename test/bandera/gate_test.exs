@@ -81,5 +81,21 @@ defmodule Bandera.GateTest do
     test "new/2 rejects an empty weights map" do
       assert_raise Gate.InvalidTargetError, fn -> Gate.new(:variant, %{}) end
     end
+
+    test "new/2 rejects non-string keys (avoids atom/string mismatch across persistence)" do
+      assert_raise Gate.InvalidTargetError, fn -> Gate.new(:variant, %{red: 1, blue: 1}) end
+    end
+
+    test "new/2 rejects negative weights" do
+      assert_raise Gate.InvalidTargetError, fn -> Gate.new(:variant, %{"a" => 2, "b" => -1}) end
+    end
+
+    test "new/2 rejects non-numeric weights" do
+      assert_raise Gate.InvalidTargetError, fn -> Gate.new(:variant, %{"a" => "lots"}) end
+    end
+
+    test "new/2 rejects an all-zero weights map (no variant could ever be selected)" do
+      assert_raise Gate.InvalidTargetError, fn -> Gate.new(:variant, %{"a" => 0, "b" => 0}) end
+    end
   end
 end

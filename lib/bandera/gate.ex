@@ -58,11 +58,23 @@ defmodule Bandera.Gate do
 
   @spec new(:variant, %{optional(String.t()) => number}) :: t
   def new(:variant, weights) when is_map(weights) and map_size(weights) > 0 do
+    unless valid_weights?(weights) do
+      raise InvalidTargetError,
+            "variant gates require a %{string => non-negative number} map with at least " <>
+              "one positive weight (string keys keep variant names stable across persistence)"
+    end
+
     %__MODULE__{type: :variant, for: nil, enabled: true, value: weights}
   end
 
   def new(:variant, _weights) do
     raise InvalidTargetError, "variant gates require a non-empty %{name => weight} map"
+  end
+
+  defp valid_weights?(weights) do
+    Enum.all?(weights, fn {name, weight} ->
+      is_binary(name) and is_number(weight) and weight >= 0
+    end) and Enum.any?(weights, fn {_name, weight} -> weight > 0 end)
   end
 
   @doc """
