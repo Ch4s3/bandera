@@ -74,4 +74,11 @@ defmodule Bandera.Store.ProcessScopedTest do
     {:ok, flag} = ProcessScoped.put(:pct, Gate.new(:percentage_of_actors, 0.7))
     assert [%Gate{type: :percentage_of_actors, for: 0.7}] = flag.gates
   end
+
+  test "round-trips a variant gate unchanged (term store, no serialization)" do
+    gate = Gate.new(:variant, %{"a" => 1, "b" => 2})
+    {:ok, flag} = ProcessScoped.put(:hero, gate)
+    assert %Flag{gates: [^gate]} = flag
+    assert {:ok, %Flag{gates: [^gate]}} = ProcessScoped.lookup(:hero)
+  end
 end
