@@ -62,4 +62,13 @@ defmodule Bandera.Store.Persistent.Redis.SerializerTest do
       assert %Flag{name: :my_flag, gates: []} = Serializer.deserialize_flag("my_flag", [])
     end
   end
+
+  test "round-trips a variant gate via JSON" do
+    gate = Gate.new(:variant, %{"a" => 1, "b" => 2})
+    {field, value} = Serializer.serialize(gate)
+    assert field == "variant"
+    assert Jason.decode!(value) == %{"a" => 1, "b" => 2}
+
+    assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [field, value])
+  end
 end

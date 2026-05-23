@@ -38,6 +38,9 @@ defmodule Bandera.Store.Persistent.Redis.Serializer do
   def serialize(%Gate{type: :percentage_of_actors, for: ratio} = gate),
     do: {Gate.id(gate), "actors/#{ratio}"}
 
+  def serialize(%Gate{type: :variant, value: weights} = gate),
+    do: {Gate.id(gate), Jason.encode!(weights)}
+
   def serialize(%Gate{enabled: enabled} = gate), do: {Gate.id(gate), to_string(enabled)}
 
   @doc """
@@ -84,6 +87,9 @@ defmodule Bandera.Store.Persistent.Redis.Serializer do
 
   defp deserialize_pair(["group/" <> group, value]),
     do: %Gate{type: :group, for: group, enabled: parse_bool(value)}
+
+  defp deserialize_pair(["variant", json]),
+    do: %Gate{type: :variant, for: nil, enabled: true, value: Jason.decode!(json)}
 
   defp deserialize_pair(["percentage", "time/" <> ratio]),
     do: %Gate{type: :percentage_of_time, for: String.to_float(ratio), enabled: true}
