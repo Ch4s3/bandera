@@ -148,5 +148,17 @@ defmodule Bandera.GateTest do
         Bandera.Gate.new(:variant, %{"a" => 0, "b" => 0})
       end
     end
+
+    test "new/2 rejects negative weights" do
+      assert_raise Bandera.Gate.InvalidTargetError, fn ->
+        Bandera.Gate.new(:variant, %{"a" => -1, "b" => 2})
+      end
+    end
+
+    test "new/2 rejects non-numeric weights" do
+      assert_raise Bandera.Gate.InvalidTargetError, fn ->
+        Bandera.Gate.new(:variant, %{"a" => "lots", "b" => 1})
+      end
+    end
   end
 end
