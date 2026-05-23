@@ -92,4 +92,13 @@ defmodule Bandera.Store.Persistent.EctoTest do
     assert {:ok, true} = Bandera.enable(:api_flag)
     assert Bandera.enabled?(:api_flag)
   end
+
+  test "variant gate persists and resolves through the Ecto adapter" do
+    {:ok, _flag} = EctoStore.put(:hero, Gate.new(:variant, %{"a" => 1, "b" => 1}))
+    {:ok, flag} = EctoStore.get(:hero)
+
+    assert [%Gate{type: :variant, value: %{"a" => 1, "b" => 1}}] = flag.gates
+    v = Flag.variant(flag, for: %{id: 7})
+    assert v in ["a", "b"]
+  end
 end
