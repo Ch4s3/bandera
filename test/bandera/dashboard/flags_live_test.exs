@@ -295,6 +295,57 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
     assert html =~ "btn btn-primary"
   end
 
+  test "add and remove a variant gate", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html =
+      render_submit(live, "add_variant", %{
+        "flag" => "billing_invoices",
+        "variant" => "blue",
+        "weight" => "1"
+      })
+
+    assert html =~ "variants blue 100%"
+    assert Bandera.variant(:billing_invoices, for: %{id: 1}) == "blue"
+
+    html =
+      render_click(live, "remove_variant", %{"flag" => "billing_invoices", "variant" => "blue"})
+
+    refute html =~ "variants blue"
+  end
+
+  test "add_variant rejects a non-positive weight", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html =
+      render_submit(live, "add_variant", %{
+        "flag" => "billing_invoices",
+        "variant" => "blue",
+        "weight" => "0"
+      })
+
+    assert html =~ "positive weight"
+  end
+
+  test "add_variant rejects a blank name", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html =
+      render_submit(live, "add_variant", %{
+        "flag" => "billing_invoices",
+        "variant" => "   ",
+        "weight" => "1"
+      })
+
+    assert html =~ "Variant needs a name"
+  end
+
   test "refreshes when another node broadcasts a flag change", %{conn: conn} do
     Application.put_env(:bandera, :cache_bust_notifications,
       enabled: true,

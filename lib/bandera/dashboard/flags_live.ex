@@ -202,6 +202,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, refresh(socket)}
     end
 
+    def handle_event(
+          "add_variant",
+          %{"flag" => name, "variant" => variant, "weight" => weight},
+          socket
+        ) do
+      with variant when variant != "" <- String.trim(variant),
+           {:ok, w} when w > 0 <- parse_number(String.trim(weight)) do
+        weights = name |> current_weights(socket) |> Map.put(variant, w)
+        Bandera.put_variants(String.to_existing_atom(name), weights)
+        {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
+      else
+        _ ->
+          {:noreply, assign(socket, :flash_error, "Variant needs a name and a positive weight.")}
+      end
+    end
+
+    def handle_event("remove_variant", %{"flag" => name, "variant" => variant}, socket) do
+      flag_name = String.to_existing_atom(name)
+      weights = name |> current_weights(socket) |> Map.delete(variant)
+
+      if map_size(weights) == 0,
+        do: Bandera.clear(flag_name, variant: true),
+        else: Bandera.put_variants(flag_name, weights)
+
+      {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
+    end
+
     def handle_event("clear_flag", %{"flag" => name}, socket) do
       flag_name = String.to_existing_atom(name)
       Bandera.clear(flag_name)
@@ -307,6 +334,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </form>
       </fieldset>
 
+      {render_variants(assigns, @flag)}
+
       <button
         type="button"
         class={Theme.class(@theme, :danger_button)}
@@ -315,6 +344,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       >
         Clear whole flag
       </button>
+      """
+    end
+
+    defp render_variants(assigns, flag) do
+      assigns = Phoenix.Component.assign(assigns, :flag, flag)
+
+      ~H"""
+      <fieldset class={Theme.class(@theme, :fieldset)}>
+        <legend class={Theme.class(@theme, :legend)}>Variants</legend>
+        <ul class={Theme.class(@theme, :gate_list)}>
+          <li :for={{name, weight} <- variant_weights(@flag)} class={Theme.class(@theme, :gate_item)}>
+            <code>{name} ({weight})</code>
+            <button
+              type="button"
+              class={Theme.class(@theme, :danger_button)}
+              phx-click="remove_variant"
+              phx-value-flag={@flag.name}
+              phx-value-variant={name}
+            >remove</button>
+          </li>
+        </ul>
+        <form phx-submit="add_variant">
+          <input type="hidden" name="flag" value={@flag.name} />
+          <input type="text" name="variant" placeholder="variant name" class={Theme.class(@theme, :input)} />
+          <input type="number" name="weight" min="1" step="any" placeholder="weight" class={Theme.class(@theme, :input)} />
+          <button class={Theme.class(@theme, :primary_button)}>add variant</button>
+        </form>
+      </fieldset>
       """
     end
 
@@ -363,6 +420,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp group_targets(flag) do
       for g <- flag.gates, Bandera.Gate.group?(g), do: g.for
+    end
+
+    defp current_flag(socket, name),
+      do: Enum.find(socket.assigns.all_flags, &(to_string(&1.name) == name))
+
+    defp variant_weights(flag) do
+      case Enum.find(flag.gates, &Bandera.Gate.variant?/1) do
+        nil -> %{}
+        gate -> gate.value
+      end
+    end
+
+    defp current_weights(name, socket) do
+      case current_flag(socket, name) do
+        nil -> %{}
+        flag -> variant_weights(flag)
+      end
+    end
+
+    defp parse_number(str) do
+      case Integer.parse(str) do
+        {i, ""} ->
+          {:ok, i}
+
+        _ ->
+          case Float.parse(str) do
+            {f, ""} -> {:ok, f}
+            _ -> :error
+          end
+      end
     end
 
     defp currently_on?(socket, name) do
