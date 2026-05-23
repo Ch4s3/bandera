@@ -84,4 +84,13 @@ defmodule Bandera.UsageTest do
     output = capture_io(fn -> Mix.Tasks.Bandera.Flags.run(["--stale", "--older-than", "30"]) end)
     assert output =~ "old"
   end
+
+  test "mix bandera.flags (no options) prints every flag name" do
+    import ExUnit.CaptureIO
+
+    {:ok, _} = Bandera.enable(:listed)
+
+    output = capture_io(fn -> Mix.Tasks.Bandera.Flags.run([]) end)
+    assert output =~ "listed"
+  end
 end
