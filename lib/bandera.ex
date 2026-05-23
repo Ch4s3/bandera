@@ -276,6 +276,62 @@ defmodule Bandera do
   @spec get_flag(atom) :: {:ok, Flag.t()} | {:error, term}
   def get_flag(flag_name) when is_atom(flag_name), do: Store.active().lookup(flag_name)
 
+  # ---- variants ----
+
+  @doc """
+  Resolves `flag_name` to one of its named variations for the given actor.
+
+  Pass `for: actor` to bucket the actor into a variant (sticky per actor + flag) and
+  `default:` for the value returned when the flag has no variant gate, no `:for`
+  actor is given, or the store lookup fails (defaults to `nil`). Emits a
+  `[:bandera, :variant]` telemetry event with `%{flag_name, options, result}`.
+
+  ## Examples
+
+      iex> Bandera.put_variants(:hero, %{"only" => 1, "never" => 0})
+      iex> Bandera.variant(:hero, for: %{id: 7})
+      "only"
+
+      iex> Bandera.variant(:missing, for: %{id: 1}, default: "control")
+      "control"
+  """
+  @spec variant(atom, keyword) :: term
+  def variant(flag_name, options \\ []) when is_atom(flag_name) do
+    default = Keyword.get(options, :default)
+
+    result =
+      case Store.active().lookup(flag_name) do
+        {:ok, flag} -> Flag.variant(flag, options)
+        error -> variant_lookup_failed(flag_name, error, default)
+      end
+
+    Bandera.Telemetry.event([:variant], %{flag_name: flag_name, options: options, result: result})
+    result
+  end
+
+  @doc """
+  Stores a `:variant` gate on `flag_name` from a `%{name => weight}` map.
+
+  Returns `{:ok, %Bandera.Flag{}}` or `{:error, reason}`. Emits a
+  `[:bandera, :put_variants]` span.
+
+  ## Examples
+
+      iex> {:ok, flag} = Bandera.put_variants(:hero, %{"a" => 1, "b" => 1})
+      iex> [gate] = flag.gates
+      iex> gate.type
+      :variant
+  """
+  @spec put_variants(atom, %{optional(String.t()) => number}, keyword) ::
+          {:ok, Flag.t()} | {:error, term}
+  def put_variants(flag_name, weights, _options \\ [])
+      when is_atom(flag_name) and is_map(weights) do
+    Bandera.Telemetry.span([:put_variants], %{flag_name: flag_name, weights: weights}, fn ->
+      result = Store.active().put(flag_name, Gate.new(:variant, weights))
+      {result, %{result: result}}
+    end)
+  end
+
   # ---- helpers ----
 
   defp put_and_verify(flag_name, gate, verify_opts) do
@@ -302,5 +358,10 @@ defmodule Bandera do
   defp lookup_failed(flag_name, error) do
     Logger.warning("[Bandera] store lookup for #{inspect(flag_name)} failed: #{inspect(error)}")
     false
+  end
+
+  defp variant_lookup_failed(flag_name, error, default) do
+    Logger.warning("[Bandera] variant lookup for #{inspect(flag_name)} failed: #{inspect(error)}")
+    default
   end
 end
