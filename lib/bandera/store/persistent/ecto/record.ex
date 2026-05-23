@@ -15,6 +15,7 @@ if Code.ensure_loaded?(Ecto.Schema) do
       field(:gate_type, :string)
       field(:target, :string)
       field(:enabled, :boolean)
+      field(:value, :string)
     end
   end
 end

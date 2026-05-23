@@ -30,6 +30,7 @@ if Code.ensure_loaded?(Ecto.Migration) do
         add(:gate_type, :string, null: false)
         add(:target, :string, null: false)
         add(:enabled, :boolean, null: false)
+        add(:value, :string)
       end
 
       create_if_not_exists(
@@ -37,6 +38,16 @@ if Code.ensure_loaded?(Ecto.Migration) do
           name: :"#{table_name}_flag_name_gate_target_idx"
         )
       )
+
+      :ok
+    end
+
+    @doc "Add the schema-v2 `value` column to an existing flags table."
+    @spec upgrade_v2() :: :ok
+    def upgrade_v2 do
+      alter table(Bandera.Config.ecto_table_name()) do
+        add_if_not_exists(:value, :string)
+      end
 
       :ok
     end

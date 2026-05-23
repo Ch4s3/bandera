@@ -21,4 +21,10 @@ defmodule Bandera.Ecto.MigrationsTest do
 
     assert rows == [["bandera_flags_flag_name_gate_target_idx"]]
   end
+
+  test "the flags table has a nullable value column (schema v2)" do
+    %{rows: rows} = Bandera.TestRepo.query!("PRAGMA table_info(bandera_flags)")
+    names = Enum.map(rows, fn row -> Enum.at(row, 1) end)
+    assert "value" in names
+  end
 end
