@@ -66,6 +66,15 @@ defmodule Bandera.UsageTest do
     refute :fresh in Bandera.stale_flags(older_than: 30)
   end
 
+  test "a flag resolved via Bandera.variant/2 is recorded and not reported stale" do
+    {:ok, _} = Bandera.put_variants(:hero, %{"a" => 1, "b" => 1})
+
+    assert Bandera.variant(:hero, for: %{id: 1}) in ["a", "b"]
+
+    assert %DateTime{} = Usage.last_evaluated(:hero)
+    refute :hero in Bandera.stale_flags(older_than: 30)
+  end
+
   test "mix bandera.flags --stale prints stale flag names" do
     import ExUnit.CaptureIO
 
