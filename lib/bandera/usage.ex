@@ -34,6 +34,12 @@ defmodule Bandera.Usage do
   def detach, do: :telemetry.detach(@handler)
 
   @doc false
+  @spec handle(
+          :telemetry.event_name(),
+          :telemetry.event_measurements(),
+          :telemetry.event_metadata(),
+          term()
+        ) :: :ok
   def handle(_event, _measurements, %{flag_name: flag_name}, _config) do
     :ets.insert(@table, {flag_name, DateTime.utc_now()})
     :ok

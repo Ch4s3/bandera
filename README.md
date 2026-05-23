@@ -56,7 +56,7 @@ further setup for development and single-node use. The persistence and
 notification backends are optional dependencies; add only the ones you use:
 
 ```elixir
-{:ecto_sql, "~> 3.10"},        # Ecto persistence (plus a DB driver, e.g. :postgrex)
+{:ecto_sql, "~> 3.10"},        # Ecto persistence (plus a DB driver: :postgrex or :ecto_sqlite3)
 {:redix, "~> 1.1"},            # Redis persistence and/or Redis PubSub notifications
 {:phoenix_pubsub, "~> 2.1"},   # Phoenix.PubSub cross-node notifications
 {:nimble_ownership, "~> 1.0", only: :test}  # required for the test layer
@@ -100,6 +100,11 @@ end
 ```
 
 The table name is read from your runtime config (default `"bandera_flags"`).
+
+The Ecto adapter is backend-agnostic: it uses only standard column types and
+binds the table at runtime, with no database-specific SQL. It works with any
+Ecto SQL database — Postgres (via `:postgrex`) or SQLite (via `:ecto_sqlite3`).
+SQLite is the backend Bandera's own test suite runs against.
 
 ## Usage
 
@@ -206,9 +211,43 @@ Overrides are cleaned up automatically when the test process exits.
 
 ## Telemetry
 
-Bandera emits `:telemetry` events for reads (`[:bandera, :enabled?]`), writes
-(`[:bandera, :enable | :disable | :clear]`), and the persistence layer. Attach
-your own handlers to measure flag usage and store latency.
+Bandera emits `:telemetry` events for reads (`[:bandera, :enabled?]`,
+`[:bandera, :variant]`), writes (`[:bandera, :enable | :disable | :clear |
+:put_variants]`), and the persistence layer. Attach your own handlers to measure
+flag usage and store latency.
+
+## Stale flags
+
+`Bandera.Usage` is an optional, telemetry-driven tracker that records when each
+flag was last evaluated (covering both `enabled?/2` and `variant/2`), so you can
+find flags that are safe to retire. It is opt-in: add it to your supervision tree
+and attach it once at boot.
+
+```elixir
+# in your application's start/2 children
+children = [
+  # ...
+  Bandera.Usage
+]
+
+# after the supervisor starts (e.g. end of start/2)
+Bandera.Usage.attach()
+```
+
+Then query stale flags in code or from the CLI:
+
+```elixir
+Bandera.stale_flags(older_than: 30)   #=> [:legacy_banner, ...]
+```
+
+```bash
+mix bandera.flags                    # all flag names
+mix bandera.flags --stale            # not evaluated in the last 30 days
+mix bandera.flags --stale --older-than 90
+```
+
+Without the tracker running, every flag is treated as never-evaluated (so all are
+reported stale).
 
 ## Dashboard (optional)
 
