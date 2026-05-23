@@ -140,6 +140,7 @@ defmodule Bandera.MixProject do
   defp deps do
     [
       {:telemetry, "~> 1.0"},
+      {:jason, "~> 1.4"},
       # Backs Bandera.Store.ProcessScoped (the test layer). optional: available in
       # Bandera's own builds; not forced on consumers. Apps using the test layer add
       # {:nimble_ownership, "~> 1.0", only: :test} to their own deps.
