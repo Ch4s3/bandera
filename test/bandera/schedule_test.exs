@@ -33,4 +33,14 @@ defmodule Bandera.ScheduleTest do
     assert {:ok, true} = Bandera.enable(:not_yet, schedule: {future, nil})
     refute Bandera.enabled?(:not_yet)
   end
+
+  test "clear(schedule: true) removes the schedule gate" do
+    {:ok, _} = Bandera.enable(:promo, schedule: {"2026-01-01T00:00:00Z", nil})
+    {:ok, flag} = Bandera.get_flag(:promo)
+    assert Enum.any?(flag.gates, &Bandera.Gate.schedule?/1)
+
+    assert :ok = Bandera.clear(:promo, schedule: true)
+    {:ok, flag} = Bandera.get_flag(:promo)
+    refute Enum.any?(flag.gates, &Bandera.Gate.schedule?/1)
+  end
 end

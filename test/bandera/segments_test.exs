@@ -40,4 +40,14 @@ defmodule Bandera.SegmentsTest do
     assert Bandera.enabled?(:new_billing, context: %{"plan" => "premium", "country" => "US"})
     refute Bandera.enabled?(:new_billing, context: %{"plan" => "free", "country" => "US"})
   end
+
+  test "clear(for_segment:) removes one segment gate" do
+    {:ok, _} = Bandera.enable(:dash, for_segment: "premium")
+    {:ok, _} = Bandera.enable(:dash, for_segment: "beta")
+
+    assert :ok = Bandera.clear(:dash, for_segment: "premium")
+    {:ok, flag} = Bandera.get_flag(:dash)
+    names = for g <- flag.gates, Bandera.Gate.segment?(g), do: g.for
+    assert names == ["beta"]
+  end
 end

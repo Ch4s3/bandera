@@ -36,4 +36,11 @@ defmodule Bandera.VariantTest do
   test "variant returns :default (nil) when no default is given and flag is unset" do
     assert Bandera.variant(:missing, for: %{id: 1}) == nil
   end
+
+  test "clear(variant: true) removes the variant gate" do
+    {:ok, _} = Bandera.put_variants(:hero, %{"a" => 1, "b" => 1})
+    assert Bandera.variant(:hero, for: %{id: 1}) in ["a", "b"]
+    assert :ok = Bandera.clear(:hero, variant: true)
+    assert Bandera.variant(:hero, for: %{id: 1}) == nil
+  end
 end

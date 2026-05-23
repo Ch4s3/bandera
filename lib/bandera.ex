@@ -253,6 +253,11 @@ defmodule Bandera do
     * `for_actor: actor` — clear one actor gate
     * `for_group: group` — clear one group gate
     * `for_percentage: true` — clear the percentage gate
+    * `variant: true` — clear the variant gate
+    * `rule: true` — clear the rule gate
+    * `for_segment: name` — clear one segment gate
+    * `requires: parent` — clear one prerequisite gate
+    * `schedule: true` — clear the schedule gate
 
   Accepts `by: identity` to record who made the change (see `Bandera.Audit`).
 
@@ -298,6 +303,23 @@ defmodule Bandera do
 
   defp do_clear(flag_name, for_percentage: true),
     do: clear_gate(flag_name, Gate.new(:percentage_of_time, 0.5))
+
+  # Gate.new/2 for :variant requires a positive-weight map, so use a bare struct;
+  # Gate.id/1 derives the slot id from the type alone, making the value irrelevant.
+  defp do_clear(flag_name, variant: true),
+    do: clear_gate(flag_name, %Gate{type: :variant})
+
+  defp do_clear(flag_name, rule: true),
+    do: clear_gate(flag_name, Gate.new(:rule, [], false))
+
+  defp do_clear(flag_name, for_segment: name) when is_atom(flag_name),
+    do: clear_gate(flag_name, Gate.new(:segment, name, false))
+
+  defp do_clear(flag_name, schedule: true),
+    do: clear_gate(flag_name, Gate.new(:schedule, {nil, nil}))
+
+  defp do_clear(flag_name, requires: parent) when is_atom(flag_name) and is_atom(parent),
+    do: clear_gate(flag_name, Gate.new(:prerequisite, parent, false))
 
   # ---- variant ----
 
