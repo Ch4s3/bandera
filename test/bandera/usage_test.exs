@@ -37,6 +37,14 @@ defmodule Bandera.UsageTest do
     assert %DateTime{} = Usage.last_evaluated(:checked)
   end
 
+  test "records usage through a real Bandera.enabled?/2 call" do
+    {:ok, _} = Bandera.enable(:checked_via_api)
+    refute Usage.last_evaluated(:checked_via_api)
+
+    assert Bandera.enabled?(:checked_via_api)
+    assert %DateTime{} = Usage.last_evaluated(:checked_via_api)
+  end
+
   test "records usage when a flag is resolved via variant/2" do
     {:ok, _} = Bandera.put_variants(:hero, %{"a" => 1, "b" => 1})
     refute Usage.last_evaluated(:hero)

@@ -100,6 +100,24 @@ defmodule Bandera.GateTest do
 
       assert {:ok, false} = Bandera.Gate.enabled?(gate)
     end
+
+    test "an open-ended window (both bounds nil) is always active" do
+      gate = Bandera.Gate.new(:schedule, {nil, nil})
+      assert {:ok, true} = Bandera.Gate.enabled?(gate)
+    end
+
+    test "a from-only window is active once started" do
+      past = DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.to_iso8601()
+      assert {:ok, true} = Bandera.Gate.enabled?(Bandera.Gate.new(:schedule, {past, nil}))
+    end
+
+    test "an until-only window is active before it closes and inactive after" do
+      future = DateTime.utc_now() |> DateTime.add(60, :second) |> DateTime.to_iso8601()
+      past = DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.to_iso8601()
+
+      assert {:ok, true} = Bandera.Gate.enabled?(Bandera.Gate.new(:schedule, {nil, future}))
+      assert {:ok, false} = Bandera.Gate.enabled?(Bandera.Gate.new(:schedule, {nil, past}))
+    end
   end
 
   describe "variant gates" do

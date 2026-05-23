@@ -87,6 +87,27 @@ defmodule Bandera.Store.Persistent.EctoTest do
     assert v in ["a", "b"]
   end
 
+  test "rule gate round-trips through the value column and evaluates with context" do
+    gate = Gate.new(:rule, [Bandera.Constraint.new("plan", :eq, "premium")], true)
+    {:ok, _} = EctoStore.put(:billing, gate)
+    {:ok, flag} = EctoStore.get(:billing)
+
+    assert [%Gate{type: :rule}] = flag.gates
+    assert Flag.enabled?(flag, context: %{"plan" => "premium"})
+    refute Flag.enabled?(flag, context: %{"plan" => "free"})
+  end
+
+  test "schedule gate round-trips through the value column and gates by window" do
+    past = DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.to_iso8601()
+    future = DateTime.utc_now() |> DateTime.add(60, :second) |> DateTime.to_iso8601()
+
+    {:ok, _} = EctoStore.put(:launch, Gate.new(:schedule, {past, future}))
+    {:ok, flag} = EctoStore.get(:launch)
+
+    assert [%Gate{type: :schedule, value: %{"from" => ^past, "until" => ^future}}] = flag.gates
+    assert Flag.enabled?(flag)
+  end
+
   test "works end-to-end through the public Bandera API via TwoLevel" do
     start_supervised!(Bandera.Store.Cache)
     Application.put_env(:bandera, :store, Bandera.Store.TwoLevel)

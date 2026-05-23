@@ -49,4 +49,32 @@ defmodule Bandera.PrerequisitesTest do
     {:ok, _} = Bandera.enable(:b)
     refute Bandera.enabled?(:a)
   end
+
+  test "a multi-level prerequisite chain requires every ancestor to be enabled" do
+    {:ok, _} = Bandera.enable(:a, requires: :b)
+    {:ok, _} = Bandera.enable(:a)
+    {:ok, _} = Bandera.enable(:b, requires: :c)
+    {:ok, _} = Bandera.enable(:b)
+
+    # c not enabled yet -> b's prerequisite fails -> a fails transitively
+    refute Bandera.enabled?(:a)
+
+    {:ok, _} = Bandera.enable(:c)
+    assert Bandera.enabled?(:a)
+  end
+
+  test "a prerequisite composes with a context rule on the child's own grant" do
+    {:ok, _} = Bandera.enable(:parent)
+    {:ok, _} = Bandera.enable(:billing, requires: :parent)
+    {:ok, _} = Bandera.enable(:billing, when: [{"plan", :eq, "premium"}])
+
+    # prerequisite met AND context matches
+    assert Bandera.enabled?(:billing, context: %{"plan" => "premium"})
+    # context misses -> not enabled even though prerequisite is met
+    refute Bandera.enabled?(:billing, context: %{"plan" => "free"})
+
+    # prerequisite vetoes regardless of context once the parent is off
+    {:ok, _} = Bandera.disable(:parent)
+    refute Bandera.enabled?(:billing, context: %{"plan" => "premium"})
+  end
 end

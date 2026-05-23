@@ -250,5 +250,14 @@ defmodule BanderaTest do
         refute Bandera.enabled?(:f)
       end)
     end
+
+    test "enabled? returns the :default on the context path when the store fails" do
+      import ExUnit.CaptureLog
+
+      capture_log(fn ->
+        assert Bandera.enabled?(:f, context: %{"plan" => "premium"}, default: true) == true
+        refute Bandera.enabled?(:f, context: %{"plan" => "premium"})
+      end)
+    end
   end
 end
