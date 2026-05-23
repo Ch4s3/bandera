@@ -54,6 +54,29 @@ defmodule Bandera.UsageTest do
     assert Usage.last_evaluated(:anything) == nil
   end
 
+  test "tracking survives a tracker restart (handler is not detached on a missing table)" do
+    :ok = stop_supervised(Usage)
+
+    # An event fired while the table is gone must NOT raise — telemetry permanently
+    # detaches any handler that raises, which would silently kill tracking for good.
+    :telemetry.execute([:bandera, :variant], %{system_time: 1}, %{
+      flag_name: :during_downtime,
+      options: [],
+      result: "a"
+    })
+
+    # After the supervisor restarts the tracker, the still-attached handler resumes.
+    start_supervised!(Usage)
+
+    :telemetry.execute([:bandera, :variant], %{system_time: 1}, %{
+      flag_name: :after_restart,
+      options: [],
+      result: "a"
+    })
+
+    assert %DateTime{} = Usage.last_evaluated(:after_restart)
+  end
+
   test "stale_flags returns flags not evaluated within the window" do
     {:ok, _} = Bandera.enable(:fresh)
     {:ok, _} = Bandera.enable(:old)

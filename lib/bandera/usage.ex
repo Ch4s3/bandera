@@ -41,7 +41,14 @@ defmodule Bandera.Usage do
           term()
         ) :: :ok
   def handle(_event, _measurements, %{flag_name: flag_name}, _config) do
-    :ets.insert(@table, {flag_name, DateTime.utc_now()})
+    # Guard against a missing table (e.g. the tracker crashed/restarted): a raise
+    # here would make telemetry permanently detach this handler, silently killing
+    # tracking even after the supervisor brings the GenServer back.
+    case :ets.whereis(@table) do
+      :undefined -> :ok
+      _ref -> :ets.insert(@table, {flag_name, DateTime.utc_now()})
+    end
+
     :ok
   end
 
