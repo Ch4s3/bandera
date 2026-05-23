@@ -154,7 +154,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     def handle_event("remove_actor", %{"flag" => name, "actor" => actor}, socket) do
       Bandera.clear(String.to_existing_atom(name), for_actor: actor)
-      {:noreply, refresh(socket)}
+      {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
 
     def handle_event("group_input", %{"flag" => name, "group" => group}, socket) do
@@ -179,7 +179,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     def handle_event("remove_group", %{"flag" => name, "group" => group}, socket) do
       Bandera.clear(String.to_existing_atom(name), for_group: group)
-      {:noreply, refresh(socket)}
+      {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
 
     def handle_event(
@@ -264,6 +264,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         _ ->
           {:noreply, socket}
       end
+    end
+
+    def handle_event("add_segment", %{"flag" => name, "segment" => segment}, socket) do
+      case String.trim(segment) do
+        "" ->
+          {:noreply, assign(socket, :flash_error, "Segment name can't be blank.")}
+
+        seg ->
+          Bandera.enable(String.to_existing_atom(name), for_segment: seg)
+          {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
+      end
+    end
+
+    def handle_event("remove_segment", %{"flag" => name, "segment" => segment}, socket) do
+      Bandera.clear(String.to_existing_atom(name), for_segment: segment)
+      {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
 
     def handle_event("clear_flag", %{"flag" => name}, socket) do
@@ -373,6 +389,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       {render_variants(assigns, @flag)}
       {render_rule(assigns, @flag)}
+      {render_segments(assigns, @flag)}
 
       <button
         type="button"
@@ -448,6 +465,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
+    defp render_segments(assigns, flag) do
+      assigns = Phoenix.Component.assign(assigns, :flag, flag)
+
+      ~H"""
+      <fieldset class={Theme.class(@theme, :fieldset)}>
+        <legend class={Theme.class(@theme, :legend)}>Segments</legend>
+        <ul class={Theme.class(@theme, :gate_list)}>
+          <li :for={seg <- segment_targets(@flag)} class={Theme.class(@theme, :gate_item)}>
+            <code>{seg}</code>
+            <button
+              type="button"
+              class={Theme.class(@theme, :danger_button)}
+              phx-click="remove_segment"
+              phx-value-flag={@flag.name}
+              phx-value-segment={seg}
+            >remove</button>
+          </li>
+        </ul>
+        <form phx-submit="add_segment">
+          <input type="hidden" name="flag" value={@flag.name} />
+          <input type="text" name="segment" placeholder="segment name" class={Theme.class(@theme, :input)} />
+          <button class={Theme.class(@theme, :primary_button)}>add segment</button>
+        </form>
+      </fieldset>
+      """
+    end
+
     # ---- assigns helpers ----
 
     defp load_flags(socket) do
@@ -494,6 +538,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp group_targets(flag) do
       for g <- flag.gates, Bandera.Gate.group?(g), do: g.for
     end
+
+    defp segment_targets(flag), do: for(g <- flag.gates, Bandera.Gate.segment?(g), do: g.for)
 
     defp current_flag(socket, name),
       do: Enum.find(socket.assigns.all_flags, &(to_string(&1.name) == name))

@@ -384,6 +384,32 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
     assert html =~ "attribute and a valid operator"
   end
 
+  test "add and remove a segment gate", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html =
+      render_submit(live, "add_segment", %{"flag" => "billing_invoices", "segment" => "premium"})
+
+    assert html =~ "premium"
+    assert html =~ "1 segment"
+
+    html =
+      render_click(live, "remove_segment", %{"flag" => "billing_invoices", "segment" => "premium"})
+
+    refute html =~ ">premium<"
+  end
+
+  test "add_segment with a blank name shows a validation error", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html = render_submit(live, "add_segment", %{"flag" => "billing_invoices", "segment" => ""})
+    assert html =~ "Segment name can"
+  end
+
   test "refreshes when another node broadcasts a flag change", %{conn: conn} do
     Application.put_env(:bandera, :cache_bust_notifications,
       enabled: true,
