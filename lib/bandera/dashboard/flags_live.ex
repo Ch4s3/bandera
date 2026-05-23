@@ -6,6 +6,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     import Bandera.Dashboard.Components
     alias Bandera.Dashboard.Theme
 
+    @constraint_operators ~w(eq neq in not_in contains gt gte lt lte matches)a
+
     @impl true
     def mount(_params, _session, socket) do
       if connected?(socket), do: subscribe_to_changes()
@@ -229,6 +231,41 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
 
+    def handle_event(
+          "add_constraint",
+          %{"flag" => name, "attribute" => attr, "operator" => op, "values" => values},
+          socket
+        ) do
+      with attr when attr != "" <- String.trim(attr),
+           {:ok, operator} <- parse_operator(op) do
+        constraint = Bandera.Constraint.new(attr, operator, parse_values(values))
+        constraints = current_constraints(name, socket) ++ [constraint]
+        Bandera.enable(String.to_existing_atom(name), when: constraints)
+        {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
+      else
+        _ ->
+          {:noreply,
+           assign(socket, :flash_error, "Rule needs an attribute and a valid operator.")}
+      end
+    end
+
+    def handle_event("remove_constraint", %{"flag" => name, "index" => index}, socket) do
+      case Integer.parse(index) do
+        {i, ""} ->
+          flag_name = String.to_existing_atom(name)
+          constraints = current_constraints(name, socket) |> List.delete_at(i)
+
+          if constraints == [],
+            do: Bandera.clear(flag_name, rule: true),
+            else: Bandera.enable(flag_name, when: constraints)
+
+          {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
+
+        _ ->
+          {:noreply, socket}
+      end
+    end
+
     def handle_event("clear_flag", %{"flag" => name}, socket) do
       flag_name = String.to_existing_atom(name)
       Bandera.clear(flag_name)
@@ -335,6 +372,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </fieldset>
 
       {render_variants(assigns, @flag)}
+      {render_rule(assigns, @flag)}
 
       <button
         type="button"
@@ -370,6 +408,41 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <input type="text" name="variant" placeholder="variant name" class={Theme.class(@theme, :input)} />
           <input type="number" name="weight" min="1" step="any" placeholder="weight" class={Theme.class(@theme, :input)} />
           <button class={Theme.class(@theme, :primary_button)}>add variant</button>
+        </form>
+      </fieldset>
+      """
+    end
+
+    defp render_rule(assigns, flag) do
+      assigns =
+        assigns
+        |> Phoenix.Component.assign(:flag, flag)
+        |> Phoenix.Component.assign(:constraints, rule_constraints(flag))
+        |> Phoenix.Component.assign(:operators, @constraint_operators)
+
+      ~H"""
+      <fieldset class={Theme.class(@theme, :fieldset)}>
+        <legend class={Theme.class(@theme, :legend)}>Rule</legend>
+        <ul class={Theme.class(@theme, :gate_list)}>
+          <li :for={{c, i} <- Enum.with_index(@constraints)} class={Theme.class(@theme, :gate_item)}>
+            <code>{c.attribute} {c.operator} {Enum.join(c.values, ", ")}</code>
+            <button
+              type="button"
+              class={Theme.class(@theme, :danger_button)}
+              phx-click="remove_constraint"
+              phx-value-flag={@flag.name}
+              phx-value-index={i}
+            >remove</button>
+          </li>
+        </ul>
+        <form phx-submit="add_constraint">
+          <input type="hidden" name="flag" value={@flag.name} />
+          <input type="text" name="attribute" placeholder="attribute" class={Theme.class(@theme, :input)} />
+          <select name="operator" class={Theme.class(@theme, :select)}>
+            <option :for={op <- @operators} value={op}>{op}</option>
+          </select>
+          <input type="text" name="values" placeholder="values (comma-separated)" class={Theme.class(@theme, :input)} />
+          <button class={Theme.class(@theme, :primary_button)}>add constraint</button>
         </form>
       </fieldset>
       """
@@ -436,6 +509,42 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       case current_flag(socket, name) do
         nil -> %{}
         flag -> variant_weights(flag)
+      end
+    end
+
+    defp rule_constraints(flag) do
+      case Enum.find(flag.gates, &Bandera.Gate.rule?/1) do
+        nil -> []
+        gate -> gate.value
+      end
+    end
+
+    defp current_constraints(name, socket) do
+      case current_flag(socket, name) do
+        nil -> []
+        flag -> rule_constraints(flag)
+      end
+    end
+
+    defp coerce_value(token) do
+      case parse_number(token) do
+        {:ok, n} -> n
+        :error -> token
+      end
+    end
+
+    defp parse_values(str) do
+      str
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.map(&coerce_value/1)
+    end
+
+    defp parse_operator(op) do
+      case Enum.find(@constraint_operators, &(Atom.to_string(&1) == op)) do
+        nil -> :error
+        atom -> {:ok, atom}
       end
     end
 

@@ -346,6 +346,44 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
     assert html =~ "Variant needs a name"
   end
 
+  test "add and remove a rule constraint", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html =
+      render_submit(live, "add_constraint", %{
+        "flag" => "billing_invoices",
+        "attribute" => "plan",
+        "operator" => "eq",
+        "values" => "pro"
+      })
+
+    assert html =~ "rule (1 constraint)"
+    assert html =~ "plan eq pro"
+
+    html =
+      render_click(live, "remove_constraint", %{"flag" => "billing_invoices", "index" => "0"})
+
+    refute html =~ "plan eq pro"
+  end
+
+  test "add_constraint rejects a blank attribute", %{conn: conn} do
+    {:ok, true} = Bandera.enable(:billing_invoices)
+    {:ok, live, _html} = live(conn, "/flags")
+    _ = render_click(live, "toggle_row", %{"flag" => "billing_invoices"})
+
+    html =
+      render_submit(live, "add_constraint", %{
+        "flag" => "billing_invoices",
+        "attribute" => "  ",
+        "operator" => "eq",
+        "values" => "pro"
+      })
+
+    assert html =~ "attribute and a valid operator"
+  end
+
   test "refreshes when another node broadcasts a flag change", %{conn: conn} do
     Application.put_env(:bandera, :cache_bust_notifications,
       enabled: true,
