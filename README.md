@@ -4,18 +4,40 @@
 [![HexDocs](https://img.shields.io/badge/hexdocs-documentation-B1A5EE)](https://hexdocs.pm/bandera)
 [![GitHub Actions](https://github.com/ch4s3/bandera/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ch4s3/bandera/actions)
 
-Feature flags for Elixir, configured **entirely at runtime**, with an
+Feature flags for Elixir with **multivariate variants, data-defined targeting,
+and time-window scheduling** — configured **entirely at runtime**, with an
 **async-safe test layer**.
 
-Bandera supports the full gate model (boolean, actor, group, and percentage
-rollouts), backed by in-memory, Ecto, or Redis storage, with an ETS cache and
-cross-node cache-busting notifications.
+Beyond the usual boolean/actor/group/percentage gates, Bandera adds N-way variant
+flags, attribute-based targeting rules with reusable segments, flag prerequisites,
+and scheduled activation windows — all stored as data, backed by in-memory, Ecto, or
+Redis storage, with an ETS cache and cross-node cache-busting notifications.
 
 ## Why Bandera?
 
-Two things it's built to get right:
+Most Elixir flag libraries cover boolean, actor, group, and percentage rollouts.
+Bandera does all of those — but it exists for the harder cases, and three
+capabilities are first-class here:
 
-**1. Runtime config, no recompilation.** Bandera reads every setting at runtime
+**1. Multivariate flags, not just on/off.** Serve one of N named variations,
+weighted and sticky per actor (the same user always sees the same variant). Built
+for A/B/n experiments and gradual variant ramps, not only kill switches. See
+[Multivariate flags](#multivariate-flags).
+
+**2. Data-defined targeting that changes without a deploy.** Target on arbitrary
+attributes with a rich operator set (`:eq`, `:in`, `:gt`, `:matches`, …) through an
+evaluation context, package them into reusable named **segments**, and gate flags on
+other flags with **prerequisites** — all stored as data. Change *who* is targeted by
+writing a row, not shipping code. See
+[Targeting rules and segments](#targeting-rules-and-segments).
+
+**3. Scheduling — flags that flip themselves.** Activate a flag inside an ISO-8601
+time window (UTC) so launches and sunsets happen on schedule, instead of someone
+toggling a switch at midnight. See [Scheduling](#scheduling).
+
+It also gets the fundamentals right:
+
+**Runtime config, no recompilation.** Bandera reads every setting at runtime
 through `Application.get_env/3` and never touches `Application.compile_env/3`.
 Compile-time config gets baked into artifacts: change a value and you recompile,
 and `mix release`'s `:validate_compile_env` check refuses to boot when
@@ -24,7 +46,7 @@ adapter, Ecto table name, and notifications all live in `config/runtime.exs`, an
 `Bandera.reload_config/0` applies changes live. Resolved config is cached in
 `:persistent_term`, so hot-path reads stay fast.
 
-**2. Async-safe testing, no global bleed or deadlocks.** Flag state is normally
+**Async-safe testing, no global bleed or deadlocks.** Flag state is normally
 global (shared ETS or a database row), so toggling a flag in one test leaks into
 others. That forces flag tests to run `async: false`, and writing flags inside
 the Ecto SQL sandbox can deadlock. Bandera ships a **process-scoped test layer**:
@@ -175,7 +197,7 @@ or has no variant gate. The actor bucketing is identical to the one used by
 `percentage_of_actors` gates — an actor's position in the weight range is
 deterministic but different per flag.
 
-## Targeting rules & segments
+## Targeting rules and segments
 
 Flags can target arbitrary attributes in an **evaluation context** map — without
 deploying code. Rules are stored as data in the flags table.
@@ -231,7 +253,8 @@ automatically affects every flag that references it.
 ### Evaluation precedence
 
 When `:for` and `:context` are both present, precedence is:
-actor gates → group gates → rule/segment gates → boolean gate → percentage gates.
+actor gates → group gates → rule/segment gates → boolean/schedule gates → percentage
+gates.
 
 ### Migrating an existing Ecto install (schema v2)
 
@@ -251,6 +274,43 @@ end
 `add/2` (so it also works on adapters such as SQLite3 that reject conditional column
 additions); run it once from a versioned migration. New installs calling
 `Bandera.Ecto.Migrations.up()` get the column automatically.
+
+## Prerequisites
+
+A flag can require another flag to be in a given state before it's allowed to turn
+on. Prerequisites only *veto* — the dependent flag still needs its own granting gate.
+
+```elixir
+Bandera.enable(:parent_feature)
+
+Bandera.enable(:child_feature, requires: :parent_feature)
+Bandera.enable(:child_feature)            # the child's own grant
+
+Bandera.enabled?(:child_feature)          # true only while :parent_feature is enabled
+```
+
+Require a parent to be *off* with `requires: {:parent, false}`. Dependency cycles and
+missing parents resolve to `false` rather than looping.
+
+## Scheduling
+
+A schedule gate enables a flag only inside an ISO-8601 time window, evaluated in UTC.
+Either bound may be `nil` for an open-ended start or end.
+
+```elixir
+# Active only during the launch window
+Bandera.enable(:black_friday,
+  schedule: {"2026-11-27T00:00:00Z", "2026-11-30T23:59:59Z"})
+
+Bandera.enabled?(:black_friday)   # true only inside the window
+
+# Open-ended: on from a start time, with no end
+Bandera.enable(:new_nav, schedule: {"2026-06-01T00:00:00Z", nil})
+```
+
+A malformed stored window fails closed (the flag is simply not enabled by the
+schedule). Schedule gates take part in the boolean fallback, so they combine with
+the other gate types just as the boolean gate does.
 
 ## Testing
 
@@ -400,6 +460,14 @@ on your existing LiveView socket. Mount it behind your own admin auth:
 See the [Dashboard guide](guides/dashboard_guide.md) for details.
 
 ## Documentation
+
+In-depth guides:
+
+- [Feature Guide](guides/features_guide.md) — multivariate flags, targeting rules,
+  segments, prerequisites, scheduling, audit log, and stale-flag tooling
+- [Using Bandera with Phoenix LiveView](guides/phoenix_liveview_guide.md)
+- [Flag Dashboard (LiveView UI)](guides/dashboard_guide.md)
+- [Migration from fun_with_flags](guides/migration_guide.md)
 
 Generate docs locally with [ExDoc](https://github.com/elixir-lang/ex_doc):
 
