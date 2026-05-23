@@ -276,6 +276,38 @@ defmodule Bandera do
   @spec get_flag(atom) :: {:ok, Flag.t()} | {:error, term}
   def get_flag(flag_name) when is_atom(flag_name), do: Store.active().lookup(flag_name)
 
+  @doc """
+  Lists flags whose last evaluation is older than `older_than` days (default 30),
+  or that were never evaluated.
+
+  Requires the opt-in `Bandera.Usage` tracker to be running and attached; without
+  it every flag is treated as never-evaluated (so all are reported stale).
+
+  ## Examples
+
+      iex> Bandera.enable(:checkout)
+      iex> Bandera.stale_flags(older_than: 30)
+      [:checkout]
+  """
+  @spec stale_flags(keyword) :: [atom]
+  def stale_flags(opts \\ []) do
+    days = Keyword.get(opts, :older_than, 30)
+    cutoff = DateTime.add(DateTime.utc_now(), -days * 86_400, :second)
+
+    case all_flag_names() do
+      {:ok, names} ->
+        Enum.filter(names, fn name ->
+          case Bandera.Usage.last_evaluated(name) do
+            nil -> true
+            at -> DateTime.compare(at, cutoff) == :lt
+          end
+        end)
+
+      _ ->
+        []
+    end
+  end
+
   # ---- variants ----
 
   @doc """

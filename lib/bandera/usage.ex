@@ -39,12 +39,21 @@ defmodule Bandera.Usage do
     :ok
   end
 
-  @doc "Returns the last time `flag_name` was evaluated, or `nil` if never."
+  @doc """
+  Returns the last time `flag_name` was evaluated, or `nil` if never (or if the
+  tracker isn't running — it is opt-in).
+  """
   @spec last_evaluated(atom) :: DateTime.t() | nil
   def last_evaluated(flag_name) do
-    case :ets.lookup(@table, flag_name) do
-      [{^flag_name, at}] -> at
-      [] -> nil
+    case :ets.whereis(@table) do
+      :undefined ->
+        nil
+
+      _ref ->
+        case :ets.lookup(@table, flag_name) do
+          [{^flag_name, at}] -> at
+          [] -> nil
+        end
     end
   end
 end
