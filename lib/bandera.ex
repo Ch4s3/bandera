@@ -116,9 +116,18 @@ defmodule Bandera do
     * `for_group: group` — enable for a named group
     * `for_percentage_of: {:time, ratio}` — enable for a ratio of calls
     * `for_percentage_of: {:actors, ratio}` — enable for a ratio of actors
+    * `when: constraints` — enable when the evaluation context matches a rule
+    * `for_segment: name` — enable for a reusable named segment
+    * `requires: parent` (or `{parent, required_state}`) — add a prerequisite
+    * `schedule: {from, until}` — enable inside an ISO-8601 time window
 
   `ratio` is a float in `0.0 < r < 1.0`. The write goes to the persistent store and
   busts/refreshes the cache; returns `{:error, reason}` if the store write fails.
+
+  The returned `enabled?` is the immediate state for unconditional/percentage gates.
+  For the **conditional** scopes (`when:`, `for_segment:`, `requires:`, `schedule:`)
+  it is `true` to signal a successful write — those gates are evaluated per call by
+  `enabled?/2` against the relevant context, actor, time, or parent flag.
 
   Pass `by: identity` to record who made the change; it is carried in the write
   telemetry metadata (see `Bandera.Audit`) and does not affect the gate written.
@@ -462,7 +471,9 @@ defmodule Bandera do
   """
   @spec stale_flags(keyword) :: [atom]
   def stale_flags(opts \\ []) do
-    days = Keyword.get(opts, :older_than, 30)
+    # Clamp to >= 0 so a negative window can't push the cutoff into the future (which
+    # would report every flag, even freshly-evaluated ones, as stale).
+    days = opts |> Keyword.get(:older_than, 30) |> max(0)
     cutoff = DateTime.add(DateTime.utc_now(), -days * 86_400, :second)
 
     case all_flag_names() do

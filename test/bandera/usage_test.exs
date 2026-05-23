@@ -65,6 +65,15 @@ defmodule Bandera.UsageTest do
     refute :fresh in Bandera.stale_flags(older_than: 30)
   end
 
+  test "a negative older_than does not mark a freshly-evaluated flag as stale" do
+    {:ok, _} = Bandera.enable(:fresh)
+    # A clearly-recent evaluation (slightly ahead of now to avoid the now-boundary).
+    :ets.insert(Bandera.Usage, {:fresh, DateTime.add(DateTime.utc_now(), 60, :second)})
+
+    # Negative window previously made the cutoff a future date -> everything stale.
+    refute :fresh in Bandera.stale_flags(older_than: -100)
+  end
+
   test "stale_flags excludes internal segment definitions" do
     {:ok, _} = Bandera.put_segment(:premium, [{"plan", :eq, "premium"}])
 
