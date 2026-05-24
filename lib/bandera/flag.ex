@@ -27,9 +27,10 @@ defmodule Bandera.Flag do
   @doc """
   Evaluates the flag, returning whether it is enabled for the given input.
 
-  With no `:for`, only boolean and percentage-of-time gates are consulted. With
-  `for: item`, actor gates are checked first, then group gates, then the boolean
-  and percentage-of-actors gates. A flag with no gates is disabled.
+  With no `:for`, boolean, schedule, and percentage-of-time gates are consulted.
+  With `for: item`, actor gates are checked first, then group gates, then rule,
+  boolean, schedule, and percentage-of-actors gates. A flag with no gates is
+  disabled.
 
   ## Examples
 
@@ -135,8 +136,9 @@ defmodule Bandera.Flag do
   @doc """
   Returns the variant chosen for the actor, or `options[:default]` (nil if not given).
 
-  Requires a variant gate to exist on the flag and `:for` to be provided. The bucket
-  is stable per actor+flag using the SHA-256 score from `Bandera.Gate.score/2`.
+  Requires a variant gate to exist on the flag and `:for` to be a non-nil actor.
+  Passing `for: nil` or omitting `:for` also returns `default`. The bucket is
+  stable per actor+flag using the SHA-256 score from `Bandera.Gate.score/2`.
 
   ## Examples
 

@@ -338,7 +338,7 @@ defmodule Bandera do
   @doc """
   Returns the variant chosen for the flag named `flag_name` (bucketed by the actor
   passed via `for:`), or `options[:default]` (nil if not given) when the flag is
-  missing or has no variant gate.
+  missing, has no variant gate, or `for:` is absent or `nil`.
 
   Looks up the flag from the active store and delegates to `Flag.variant/2`. A missing
   flag or store lookup error returns `options[:default]` (the error is logged).
@@ -369,6 +369,9 @@ defmodule Bandera do
   `weights` is a `%{variant_name => weight}` map; actors are bucketed proportionally
   by weight using a stable SHA-256 hash per actor+flag. Returns `{:ok, flag}` on
   success, `{:error, reason}` on a store write failure.
+
+  The optional third argument is accepted for API uniformity but is ignored.
+  `put_variants` does not support `by:` and is not audited by `Bandera.Audit`.
 
   ## Examples
 
