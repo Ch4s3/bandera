@@ -205,9 +205,12 @@ defmodule Bandera do
   @doc """
   Disables `flag_name`, optionally scoped by an option, and returns `{:ok, enabled?}`.
 
-  Accepts the same scopes as `enable/2` (`for_actor:`, `for_group:`,
-  `for_percentage_of:`). For a percentage scope, disabling for `ratio` is equivalent
-  to enabling for `1.0 - ratio`. Returns `{:error, reason}` on a store write failure.
+  Accepts the negatable scopes `for_actor:`, `for_group:`, and `for_percentage_of:`
+  (for a percentage scope, disabling for `ratio` is equivalent to enabling for
+  `1.0 - ratio`). To remove a grant-only gate (`variant`, `rule`, `segment`,
+  `prerequisite`, `schedule`), use `clear/2`; passing one of those scopes here
+  returns `{:error, :unsupported_scope}`. Returns `{:error, reason}` on a store
+  write failure.
 
   Accepts `by: identity` to record who made the change (see `Bandera.Audit`).
 
@@ -252,6 +255,8 @@ defmodule Bandera do
       error -> error
     end
   end
+
+  defp do_disable(_flag_name, _options), do: {:error, :unsupported_scope}
 
   # ---- clear ----
 
@@ -332,6 +337,13 @@ defmodule Bandera do
 
   defp do_clear(flag_name, requires: parent) when is_atom(flag_name) and is_atom(parent),
     do: clear_gate(flag_name, Gate.new(:prerequisite, parent, false))
+
+  # The required state is not part of the prerequisite gate's slot id, so the tuple
+  # form clears the same gate as the bare-atom form — accepted for symmetry with enable/2.
+  defp do_clear(flag_name, requires: {parent, _required}) when is_atom(flag_name),
+    do: do_clear(flag_name, requires: parent)
+
+  defp do_clear(_flag_name, _options), do: {:error, :unsupported_scope}
 
   # ---- variant ----
 

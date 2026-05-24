@@ -70,16 +70,35 @@ defmodule Bandera.Store.Persistent.Redis.SerializerTest do
     assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [field, value])
   end
 
-  test "round-trips a rule gate via JSON" do
+  test "round-trips a rule gate via JSON, preserving enabled" do
     gate = Gate.new(:rule, [Bandera.Constraint.new("plan", :eq, "premium")], true)
     {field, value} = Serializer.serialize(gate)
     assert field == "rule"
 
-    assert Jason.decode!(value) == [
-             %{"attribute" => "plan", "operator" => "eq", "values" => ["premium"]}
-           ]
+    assert Jason.decode!(value) == %{
+             "enabled" => true,
+             "constraints" => [
+               %{"attribute" => "plan", "operator" => "eq", "values" => ["premium"]}
+             ]
+           }
 
     assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [field, value])
+  end
+
+  test "round-trips a disabled rule gate (enabled is not silently dropped)" do
+    gate = Gate.new(:rule, [Bandera.Constraint.new("plan", :eq, "premium")], false)
+    {field, value} = Serializer.serialize(gate)
+    assert %Flag{gates: [^gate]} = Serializer.deserialize_flag(:f, [field, value])
+  end
+
+  test "reads the legacy bare-array rule format as enabled" do
+    legacy =
+      Jason.encode!([%{"attribute" => "plan", "operator" => "eq", "values" => ["premium"]}])
+
+    assert %Flag{gates: [%Gate{type: :rule, enabled: true, value: [constraint]}]} =
+             Serializer.deserialize_flag(:f, ["rule", legacy])
+
+    assert constraint == Bandera.Constraint.new("plan", :eq, "premium")
   end
 
   test "round-trips a prerequisite gate" do

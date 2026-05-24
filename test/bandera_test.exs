@@ -70,6 +70,20 @@ defmodule BanderaTest do
     refute Bandera.enabled?(:f)
   end
 
+  test "disable/2 with an unsupported scope returns {:error, :unsupported_scope}" do
+    assert {:error, :unsupported_scope} = Bandera.disable(:f, schedule: {nil, nil})
+    assert {:error, :unsupported_scope} = Bandera.disable(:f, when: [{"plan", :eq, "premium"}])
+  end
+
+  test "clear/2 accepts the requires: {parent, required} tuple form (symmetry with enable)" do
+    {:ok, _} = Bandera.enable(:child, requires: {:parent, false})
+    assert :ok = Bandera.clear(:child, requires: {:parent, false})
+  end
+
+  test "clear/2 with an unsupported scope returns {:error, :unsupported_scope}" do
+    assert {:error, :unsupported_scope} = Bandera.clear(:f, nonsense: true)
+  end
+
   test "all_flag_names and all_flags" do
     {:ok, _} = Bandera.enable(:a)
     {:ok, _} = Bandera.enable(:b)

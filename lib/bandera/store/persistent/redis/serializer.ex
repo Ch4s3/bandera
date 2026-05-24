@@ -42,8 +42,13 @@ defmodule Bandera.Store.Persistent.Redis.Serializer do
   def serialize(%Gate{type: :variant, value: weights} = gate),
     do: {Gate.id(gate), Jason.encode!(weights)}
 
-  def serialize(%Gate{type: :rule, value: constraints} = gate),
-    do: {Gate.id(gate), Jason.encode!(Enum.map(constraints, &Bandera.Constraint.to_map/1))}
+  def serialize(%Gate{type: :rule, value: constraints, enabled: enabled} = gate),
+    do:
+      {Gate.id(gate),
+       Jason.encode!(%{
+         "enabled" => enabled,
+         "constraints" => Enum.map(constraints, &Bandera.Constraint.to_map/1)
+       })}
 
   def serialize(%Gate{type: :schedule, value: window} = gate),
     do: {Gate.id(gate), Jason.encode!(window)}
@@ -99,17 +104,7 @@ defmodule Bandera.Store.Persistent.Redis.Serializer do
   defp deserialize_pair(["variant", json]),
     do: %Gate{type: :variant, for: nil, enabled: true, value: Jason.decode!(json)}
 
-  # Rule gates are stored grant-when-matched: only the constraint list is encoded,
-  # so they always deserialize as enabled. There is no public API to write a
-  # disabled rule gate; if disable-by-rule is ever added, encode `enabled` here and
-  # in serialize/1 (e.g. a %{"enabled" => bool, "constraints" => [...]} object).
-  defp deserialize_pair(["rule", json]),
-    do: %Gate{
-      type: :rule,
-      for: nil,
-      enabled: true,
-      value: json |> Jason.decode!() |> Enum.map(&Bandera.Constraint.from_map/1)
-    }
+  defp deserialize_pair(["rule", json]), do: decode_rule(Jason.decode!(json))
 
   defp deserialize_pair(["prerequisite/" <> parent, value]),
     do: %Gate{type: :prerequisite, for: existing_atom(parent), enabled: parse_bool(value)}
@@ -134,6 +129,26 @@ defmodule Bandera.Store.Persistent.Redis.Serializer do
 
   defp deserialize_pair(["percentage", "actors/" <> ratio]),
     do: %Gate{type: :percentage_of_actors, for: String.to_float(ratio), enabled: true}
+
+  # Current format: an object carrying the gate's enabled flag alongside the
+  # constraints, matching the Ecto adapter's separate `enabled` column.
+  defp decode_rule(%{"enabled" => enabled, "constraints" => constraints}),
+    do: %Gate{
+      type: :rule,
+      for: nil,
+      enabled: enabled,
+      value: Enum.map(constraints, &Bandera.Constraint.from_map/1)
+    }
+
+  # Legacy format (before `enabled` was encoded): a bare constraint array, which was
+  # always stored grant-when-matched, so it reads back as enabled.
+  defp decode_rule(constraints) when is_list(constraints),
+    do: %Gate{
+      type: :rule,
+      for: nil,
+      enabled: true,
+      value: Enum.map(constraints, &Bandera.Constraint.from_map/1)
+    }
 
   defp parse_bool("true"), do: true
   defp parse_bool(_), do: false
