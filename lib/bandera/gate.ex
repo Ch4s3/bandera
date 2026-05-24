@@ -24,7 +24,7 @@ defmodule Bandera.Gate do
         }
 
   defmodule InvalidTargetError do
-    @moduledoc "Raised when a percentage gate is built with a ratio outside `0.0 < r < 1.0`."
+    @moduledoc "Raised when a gate is built with an invalid target — out-of-range percentage ratio, empty variant map, all-zero or negative variant weights."
     defexception [:message]
   end
 
@@ -33,12 +33,14 @@ defmodule Bandera.Gate do
 
   The two-argument form covers `:boolean` gates (with a boolean value), the two
   percentage gate types (`:percentage_of_time` / `:percentage_of_actors`, with a
-  ratio strictly between `0.0` and `1.0`), and `:variant` gates (with a
-  `%{name => weight}` map). The three-argument form (see below) covers `:actor`
-  and `:group` gates.
+  ratio strictly between `0.0` and `1.0`), `:variant` gates (with a
+  `%{name => weight}` map), and `:schedule` gates (with a `{from, until}` tuple of
+  ISO-8601 strings or `nil` bounds). The three-argument form (see below) covers
+  `:actor`, `:group`, `:rule`, `:segment`, and `:prerequisite` gates.
 
-  Raises `Bandera.Gate.InvalidTargetError` when a percentage ratio is out of range
-  or a variant weights map is empty.
+  Raises `Bandera.Gate.InvalidTargetError` when a percentage ratio is out of range,
+  a variant weights map is empty, all variant weights are zero, or any variant weight
+  is negative.
 
   ## Examples
 
@@ -259,6 +261,14 @@ defmodule Bandera.Gate do
 
   @doc """
   Returns `true` if the gate is a `:prerequisite` gate.
+
+  ## Examples
+
+      iex> Bandera.Gate.prerequisite?(Bandera.Gate.new(:prerequisite, :parent, true))
+      true
+
+      iex> Bandera.Gate.prerequisite?(Bandera.Gate.new(:boolean, true))
+      false
   """
   @spec prerequisite?(t) :: boolean
   def prerequisite?(%__MODULE__{type: :prerequisite}), do: true
@@ -266,6 +276,14 @@ defmodule Bandera.Gate do
 
   @doc """
   Returns `true` if the gate is a `:schedule` gate.
+
+  ## Examples
+
+      iex> Bandera.Gate.schedule?(Bandera.Gate.new(:schedule, {nil, nil}))
+      true
+
+      iex> Bandera.Gate.schedule?(Bandera.Gate.new(:boolean, true))
+      false
   """
   @spec schedule?(t) :: boolean
   def schedule?(%__MODULE__{type: :schedule}), do: true

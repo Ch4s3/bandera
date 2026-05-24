@@ -11,6 +11,7 @@ defmodule Bandera.Usage do
   @handler {__MODULE__, :usage}
   @events [[:bandera, :enabled?], [:bandera, :variant]]
 
+  @doc "Starts the Usage tracker and creates its ETS table. Add to your supervision tree."
   @spec start_link(keyword) :: GenServer.on_start()
   def start_link(opts \\ []),
     do: GenServer.start_link(__MODULE__, :ok, Keyword.put_new(opts, :name, __MODULE__))
@@ -21,11 +22,13 @@ defmodule Bandera.Usage do
     {:ok, %{}}
   end
 
+  @doc "Registers the telemetry handler. Call once after the supervisor starts."
   @spec attach() :: :ok | {:error, :already_exists}
   def attach do
     :telemetry.attach_many(@handler, @events, &__MODULE__.handle/4, nil)
   end
 
+  @doc "Unregisters the telemetry handler."
   @spec detach() :: :ok | {:error, :not_found}
   def detach, do: :telemetry.detach(@handler)
 
@@ -40,6 +43,7 @@ defmodule Bandera.Usage do
     _error -> :ok
   end
 
+  @doc "Returns the last UTC `DateTime` `flag_name` was evaluated, or `nil` if never seen."
   @spec last_evaluated(atom) :: DateTime.t() | nil
   def last_evaluated(flag_name) do
     case :ets.lookup(@table, flag_name) do

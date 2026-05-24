@@ -20,7 +20,7 @@ Most Elixir flag libraries cover boolean, actor, group, and percentage rollouts.
 Bandera does all of those — but it exists for the harder cases, and three
 capabilities are first-class here:
 
-**1. Multivariate flags, not just on/off.** Serve one of N named variations,
+**1. Multivariate flags, not just on/off.** Serve one of N named variants,
 weighted and sticky per actor (the same user always sees the same variant). Built
 for A/B/n experiments and gradual variant ramps, not only kill switches. See
 [Multivariate flags](#multivariate-flags).
@@ -198,10 +198,10 @@ Bandera.variant(:hero_cta, default: "control")
 Bandera.put_variants(:checkout, %{"control" => 9, "new_flow" => 1})
 ```
 
-`variant/2` returns `nil` (or `options[:default]`) when the flag does not exist
-or has no variant gate. The actor bucketing is identical to the one used by
-`percentage_of_actors` gates — an actor's position in the weight range is
-deterministic but different per flag.
+`variant/2` returns `nil` (or `options[:default]`) when the flag does not exist,
+has no variant gate, or no `for:` actor is given (including `for: nil`). The same
+stable SHA-256 score used by `percentage_of_actors` gates determines an actor's
+bucket — deterministic per actor+flag pair, different across flags.
 
 ## Targeting rules and segments
 

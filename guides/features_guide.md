@@ -1,8 +1,9 @@
 # Feature Guide
 
 A short, practical tour of Bandera's targeting, rollout, and operations features.
-Every example assumes Bandera is configured with a store (see the README). All the
-write functions accept an optional `by:` identity (see [Audit log](#audit-log)).
+Every example assumes Bandera is configured with a store (see the README).
+`enable/2`, `disable/2`, and `clear/2` accept an optional `by:` identity
+(see [Audit log](#audit-log)).
 
 - [Fail-open default](#fail-open-default)
 - [Audit log](#audit-log)
@@ -53,7 +54,7 @@ Detach with `Bandera.Audit.detach(:my_audit)`.
 
 ## Multivariate flags
 
-Instead of on/off, a flag can return one of N named variations, stable per actor
+Instead of on/off, a flag can return one of N named variants, stable per actor
 (the same actor always lands in the same variant for a given flag). Weights are
 relative.
 
@@ -96,7 +97,7 @@ Supported operators:
 | `:in`, `:not_in` | membership in a list |
 | `:contains` | substring (strings) |
 | `:gt`, `:gte`, `:lt`, `:lte` | ordering (numbers or strings) |
-| `:matches` | regex match (an invalid pattern is treated as no match) |
+| `:matches` | unanchored regex match — `"admin"` matches `"superadmin"`; use `^`/`$` for full-string; an invalid pattern never matches |
 
 A missing context attribute never matches. Rule gates compose with the usual
 actor/group/boolean/percentage gates.
@@ -118,7 +119,7 @@ Bandera.enabled?(:new_billing, context: %{"plan" => "premium", "country" => "US"
 # => true
 ```
 
-Segments are resolved at evaluation time against the current context.
+Segments are expanded at evaluation time against the current context.
 
 ## Prerequisites
 

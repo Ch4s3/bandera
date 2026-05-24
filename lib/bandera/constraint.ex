@@ -4,11 +4,11 @@ defmodule Bandera.Constraint do
 
   Context values often arrive as strings (JSON bodies, query params, headers), so
   equality, membership, and ordering operators coerce numeric strings to numbers
-  before comparing — `%{"age" => "5"}` does **not** satisfy `{"age", :gte, 18}`.
-  Ordering between a number and a non-numeric string fails closed (no match). A
-  missing attribute never matches. `:matches` is an unanchored regex, so
-  `{"role", :matches, "admin"}` also matches `"superadmin"`; anchor with `^`/`$` if
-  you need a full-string match.
+  before comparing — `%{"age" => "20"}` **does** satisfy `{"age", :gte, 18}` because
+  `"20"` coerces to `20`. Ordering between a number and a non-numeric string fails
+  closed (no match). A missing attribute never matches. `:matches` is an unanchored
+  regex, so `{"role", :matches, "admin"}` also matches `"superadmin"`; anchor with
+  `^`/`$` if you need a full-string match.
   """
 
   @enforce_keys [:attribute, :operator, :values]
@@ -18,12 +18,44 @@ defmodule Bandera.Constraint do
 
   @type t :: %__MODULE__{attribute: String.t(), operator: atom, values: [term]}
 
+  @doc """
+  Builds a constraint for `attribute` using `operator` and `value`.
+
+  `operator` must be one of `:eq`, `:neq`, `:in`, `:not_in`, `:contains`, `:gt`,
+  `:gte`, `:lt`, `:lte`, or `:matches`. For list operators (`:in`, `:not_in`) pass a
+  list as `value`; for all others a single scalar. Scalars are wrapped in a list
+  internally.
+
+  ## Examples
+
+      iex> c = Bandera.Constraint.new("plan", :eq, "premium")
+      iex> Bandera.Constraint.match?(c, %{"plan" => "premium"})
+      true
+  """
   @spec new(String.t(), atom, term) :: t
   def new(attribute, operator, values)
       when is_binary(attribute) and operator in @operators do
     %__MODULE__{attribute: attribute, operator: operator, values: List.wrap(values)}
   end
 
+  @doc """
+  Returns `true` when the constraint matches the given evaluation `context` map.
+
+  The context map uses string keys. A missing key never matches. Numeric strings
+  are coerced to numbers before comparison (see the module doc).
+
+  ## Examples
+
+      iex> c = Bandera.Constraint.new("age", :gte, 18)
+      iex> Bandera.Constraint.match?(c, %{"age" => "20"})
+      true
+
+      iex> Bandera.Constraint.match?(c, %{"age" => "15"})
+      false
+
+      iex> Bandera.Constraint.match?(c, %{})
+      false
+  """
   @spec match?(t, map) :: boolean
   def match?(%__MODULE__{attribute: a, operator: op, values: values}, context) do
     apply_op(op, Map.get(context, a), values)
@@ -104,10 +136,12 @@ defmodule Bandera.Constraint do
     end
   end
 
+  @doc false
   @spec to_map(t) :: map
   def to_map(%__MODULE__{attribute: a, operator: op, values: v}),
     do: %{"attribute" => a, "operator" => Atom.to_string(op), "values" => v}
 
+  @doc false
   @spec from_map(map) :: t
   def from_map(%{"attribute" => a, "operator" => op, "values" => v}),
     do: new(a, String.to_existing_atom(op), v)
