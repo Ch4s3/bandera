@@ -34,12 +34,32 @@ if Code.ensure_loaded?(NimbleOwnership) do
     explicitly within a test if needed.
 
     The `use Bandera.Test` macro imports `enable_flag/1,2` and `disable_flag/1,2`
-    for unqualified use. The remaining helpers — `put_flag/2,3`, `clear/1`, and
+    for unqualified use. The remaining helpers — `put_flag/2,3,4`, `clear/1,2`, and
     `reset/0` — are called fully qualified, e.g. `Bandera.Test.reset()`.
+
+    ## Testing a named instance
+
+    A named instance can use `Bandera.Store.ProcessScoped` too — configure it in
+    the test env just like the default instance:
+
+        # config/test.exs
+        config :my_app, MyApp.Flags, store: Bandera.Store.ProcessScoped
+
+    still calling `Bandera.Test.start/0` once (one ownership server backs every
+    instance; overrides are scoped per instance under the hood). Then either call
+    the facade directly:
+
+        MyApp.Flags.enable(:f)
+
+    or bind the `enable_flag`/`disable_flag` helpers and the `@tag feature_flags`
+    setup to that instance:
+
+        use Bandera.Test, instance: MyApp.Flags
 
     Consumers must add `{:nimble_ownership, "~> 1.0", only: :test}` to their deps.
     """
 
+    alias Bandera.Config
     alias Bandera.Store.ProcessScoped
 
     @doc """
@@ -57,13 +77,27 @@ if Code.ensure_loaded?(NimbleOwnership) do
 
     @doc "Set a flag's boolean value for the current process (and its `$callers`)."
     @spec put_flag(atom, boolean) :: :ok
-    def put_flag(flag_name, true), do: drop(Bandera.enable(flag_name))
-    def put_flag(flag_name, false), do: drop(Bandera.disable(flag_name))
+    def put_flag(flag_name, value), do: put_flag(flag_name, value, nil, [])
 
     @doc "Set a flag's boolean value for a specific actor in the current process."
     @spec put_flag(atom, boolean, term) :: :ok
-    def put_flag(flag_name, true, actor), do: drop(Bandera.enable(flag_name, for_actor: actor))
-    def put_flag(flag_name, false, actor), do: drop(Bandera.disable(flag_name, for_actor: actor))
+    def put_flag(flag_name, value, actor), do: put_flag(flag_name, value, actor, [])
+
+    @doc """
+    Set a flag's boolean value for the current process, optionally scoped to `actor`.
+
+    `actor` may be `nil` to target the plain boolean gate. Accepts `instance:` in
+    `opts` (default the default instance).
+    """
+    @spec put_flag(atom, boolean, term, keyword) :: :ok
+    def put_flag(flag_name, true, nil, opts), do: drop(Bandera.enable(flag_name, opts))
+    def put_flag(flag_name, false, nil, opts), do: drop(Bandera.disable(flag_name, opts))
+
+    def put_flag(flag_name, true, actor, opts),
+      do: drop(Bandera.enable(flag_name, [{:for_actor, actor} | opts]))
+
+    def put_flag(flag_name, false, actor, opts),
+      do: drop(Bandera.disable(flag_name, [{:for_actor, actor} | opts]))
 
     @doc "Enable a flag for the current process."
     @spec enable_flag(atom) :: :ok
@@ -83,9 +117,19 @@ if Code.ensure_loaded?(NimbleOwnership) do
 
     @doc "Clear a single flag's overrides for the current process."
     @spec clear(atom) :: :ok
-    def clear(flag_name), do: drop(Bandera.clear(flag_name))
+    def clear(flag_name), do: clear(flag_name, [])
 
-    @doc "Clear ALL of the current process's flag overrides."
+    @doc "Clear a single flag's overrides for the current process, in `instance:` (opts)."
+    @spec clear(atom, keyword) :: :ok
+    def clear(flag_name, opts), do: drop(Bandera.clear(flag_name, opts))
+
+    @doc """
+    Clear ALL of the current process's flag overrides, across every instance.
+
+    This is a single `NimbleOwnership.cleanup_owner/2` call against the shared
+    ownership server, so it drops the calling process's overrides for the default
+    instance and every named instance that also uses `Bandera.Store.ProcessScoped`.
+    """
     @spec reset() :: :ok
     def reset do
       NimbleOwnership.cleanup_owner(ProcessScoped, self())
@@ -98,18 +142,55 @@ if Code.ensure_loaded?(NimbleOwnership) do
     defp drop({:error, reason}),
       do: raise("Bandera.Test: unexpected store error: #{inspect(reason)}")
 
-    @doc false
-    defmacro __using__(_opts) do
-      quote do
-        import Bandera.Test,
-          only: [enable_flag: 1, enable_flag: 2, disable_flag: 1, disable_flag: 2]
+    @doc """
+    Sets up `@tag feature_flags` and, without `instance:`, imports `enable_flag/1,2`
+    and `disable_flag/1,2` for unqualified use against the default instance.
 
-        setup context do
-          for {flag_name, value} <- Map.get(context, :feature_flags, []) do
-            Bandera.Test.put_flag(flag_name, value)
+    Pass `instance: MyApp.Flags` to bind `@tag feature_flags` (and to define private
+    `enable_flag/1,2` and `disable_flag/1,2` helpers, since an import can't be bound
+    to a specific instance) to that instance instead.
+    """
+    defmacro __using__(opts) do
+      instance = Keyword.get(opts, :instance, Config.default_instance())
+
+      if instance == Config.default_instance() do
+        quote do
+          import Bandera.Test,
+            only: [enable_flag: 1, enable_flag: 2, disable_flag: 1, disable_flag: 2]
+
+          setup context do
+            for {flag_name, value} <- Map.get(context, :feature_flags, []) do
+              Bandera.Test.put_flag(flag_name, value)
+            end
+
+            :ok
           end
+        end
+      else
+        quote bind_quoted: [instance: instance] do
+          # A module attribute, not the bound variable, because `def`/`defp` bodies
+          # compile in their own scope and can't see variables from the caller.
+          @bandera_test_instance instance
 
-          :ok
+          defp enable_flag(flag_name),
+            do: Bandera.Test.put_flag(flag_name, true, nil, instance: @bandera_test_instance)
+
+          defp enable_flag(flag_name, actor),
+            do: Bandera.Test.put_flag(flag_name, true, actor, instance: @bandera_test_instance)
+
+          defp disable_flag(flag_name),
+            do: Bandera.Test.put_flag(flag_name, false, nil, instance: @bandera_test_instance)
+
+          defp disable_flag(flag_name, actor),
+            do: Bandera.Test.put_flag(flag_name, false, actor, instance: @bandera_test_instance)
+
+          setup context do
+            for {flag_name, value} <- Map.get(context, :feature_flags, []) do
+              Bandera.Test.put_flag(flag_name, value, nil, instance: @bandera_test_instance)
+            end
+
+            :ok
+          end
         end
       end
     end

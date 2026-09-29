@@ -15,5 +15,6 @@ defmodule Bandera.Dashboard.TestRouter do
     pipe_through(:browser)
     bandera_dashboard("/flags")
     bandera_dashboard("/feature-flags", live_session_name: :bandera_dashboard_alt)
+    bandera_dashboard("/other-flags", instance: Bandera.Dashboard.TestInstance)
   end
 end

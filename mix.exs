@@ -75,6 +75,7 @@ defmodule Bandera.MixProject do
       "guides/features_guide.md": [title: "Feature Guide"],
       "guides/phoenix_liveview_guide.md": [title: "Using Bandera with Phoenix LiveView"],
       "guides/dashboard_guide.md": [title: "Flag Dashboard (LiveView UI)"],
+      "guides/multiple_instances_guide.md": [title: "Running Multiple Instances"],
       "guides/migration_guide.md": [title: "Migration from fun_with_flags"],
       "CHANGELOG.md": [title: "Changelog"]
     ]
@@ -88,6 +89,9 @@ defmodule Bandera.MixProject do
 
   defp groups_for_modules do
     [
+      Configuration: [
+        Bandera.Config
+      ],
       Stores: [
         Bandera.Store,
         Bandera.Store.TwoLevel,

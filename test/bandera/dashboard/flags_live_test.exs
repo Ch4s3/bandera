@@ -795,6 +795,100 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
     assert render(live) =~ "promo_banner"
   end
 
+  describe "named instance dashboard" do
+    @named Bandera.Dashboard.TestInstance
+
+    setup do
+      start_supervised!(
+        {Bandera,
+         name: @named,
+         persistence: [adapter: Bandera.Store.Persistent.Memory],
+         dashboard: [group_separator: "_"]}
+      )
+
+      :ok
+    end
+
+    test "lists only that instance's flags", %{conn: conn} do
+      {:ok, true} = Bandera.enable(:default_only)
+      {:ok, true} = Bandera.enable(:named_only, instance: @named)
+
+      {:ok, _live, html} = live(conn, "/other-flags")
+
+      assert html =~ "named_only"
+      refute html =~ "default_only"
+    end
+
+    test "toggling from it writes to the named instance, not the default", %{conn: conn} do
+      {:ok, false} = Bandera.disable(:shared_name)
+      {:ok, false} = Bandera.disable(:shared_name, instance: @named)
+
+      {:ok, live, _html} = live(conn, "/other-flags")
+      render_click(live, "toggle_boolean", %{"flag" => "shared_name"})
+
+      assert Bandera.enabled?(:shared_name, instance: @named)
+      refute Bandera.enabled?(:shared_name)
+    end
+
+    test "a broadcast on the default instance's topic does not refresh it", %{conn: conn} do
+      {:ok, live, html} = live(conn, "/other-flags")
+      refute html =~ "promo_banner"
+
+      {:ok, true} = Bandera.enable(:promo_banner, instance: @named)
+
+      # This dashboard is bound to @named, which has no PubSub notifications
+      # configured, so it never subscribed to any topic at all.
+      Phoenix.PubSub.broadcast(
+        Bandera.Dashboard.TestPubSub,
+        "bandera:changes",
+        {:bandera_change, :promo_banner, "other-node"}
+      )
+
+      refute render(live) =~ "promo_banner"
+    end
+  end
+
+  describe "named instance dashboard with cache-busting notifications" do
+    @named Bandera.Dashboard.TestInstance
+
+    setup do
+      # Starts the instance's real PhoenixPubSub notifier alongside the dashboard.
+      start_supervised!(
+        {Bandera,
+         name: @named,
+         persistence: [adapter: Bandera.Store.Persistent.Memory],
+         dashboard: [group_separator: "_"],
+         cache_bust_notifications: [
+           enabled: true,
+           adapter: Bandera.Notifications.PhoenixPubSub,
+           client: Bandera.Dashboard.TestPubSub
+         ]}
+      )
+
+      :ok
+    end
+
+    test "refreshes when another node broadcasts on the instance's own topic", %{conn: conn} do
+      conf = Bandera.Config.get(@named)
+
+      assert Bandera.Notifications.topic(conf) ==
+               "bandera:{Bandera.Dashboard.TestInstance}:changes"
+
+      {:ok, live, html} = live(conn, "/other-flags")
+      refute html =~ "promo_banner"
+
+      {:ok, true} = Bandera.enable(:promo_banner, instance: @named)
+
+      Phoenix.PubSub.broadcast(
+        Bandera.Dashboard.TestPubSub,
+        Bandera.Notifications.topic(conf),
+        {:bandera_change, :promo_banner, "other-node"}
+      )
+
+      assert render(live) =~ "promo_banner"
+    end
+  end
+
   defp actor_gate(flag_name, target), do: find_gate(flag_name, :actor, target)
   defp group_gate(flag_name, target), do: find_gate(flag_name, :group, target)
 

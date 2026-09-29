@@ -13,7 +13,9 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     locally.
 
     The table is separate from the flags table — create it via
-    `Bandera.Ecto.Migrations.up_usage/0`.
+    `Bandera.Ecto.Migrations.up_usage/0`. Its name (`usage_table_name`, default
+    `"bandera_usage"`), repo, and `prefix` come from the instance's
+    `persistence:` config.
 
     Only active when `persistence: [adapter: Bandera.Store.Persistent.Ecto]`
     is configured. DB errors are returned without raising so ETS-only operation
@@ -27,15 +29,14 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     alias Bandera.Usage.Record
 
     @doc """
-    Loads all rows from the DB usage table into `ets_table`, keeping whichever
+    Loads all rows from `conf`'s DB usage table into `ets_table`, keeping whichever
     timestamp is newer. Called at startup and before periodic flushes. Pass
     `return_errors: true` when the caller needs to distinguish a failed load
     from a successful no-op.
     """
-    @spec load_into_ets(atom) :: :ok
-    @spec load_into_ets(atom, keyword) :: :ok | {:error, term}
-    def load_into_ets(ets_table, opts \\ []) do
-      rows = repo().all(from(r in {table_name(), Record}))
+    @spec load_into_ets(Config.t(), atom, keyword) :: :ok | {:error, term}
+    def load_into_ets(%Config{} = conf, ets_table, opts) do
+      rows = repo(conf).all(from(r in {table_name(conf), Record}), repo_opts(conf))
 
       for %Record{flag_name: name, last_evaluated_at: db_at} <- rows do
         atom = String.to_atom(name)
@@ -55,12 +56,18 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       error -> if Keyword.get(opts, :return_errors, false), do: {:error, error}, else: :ok
     end
 
+    @doc "Default-instance form of `load_into_ets/3` (backward compatibility)."
+    @spec load_into_ets(atom) :: :ok
+    @spec load_into_ets(atom, keyword) :: :ok | {:error, term}
+    def load_into_ets(ets_table, opts \\ []) when is_atom(ets_table),
+      do: load_into_ets(Config.get(), ets_table, opts)
+
     @doc """
-    Upserts every `{flag_name, datetime}` pair in `ets_table` into the DB,
-    keeping the greater of the persisted and incoming timestamps.
+    Upserts every `{flag_name, datetime}` pair in `ets_table` into `conf`'s DB
+    usage table, keeping the greater of the persisted and incoming timestamps.
     """
-    @spec flush_all(atom) :: :ok
-    def flush_all(ets_table) do
+    @spec flush_all(Config.t(), atom) :: :ok
+    def flush_all(%Config{} = conf, ets_table) do
       rows =
         ets_table
         |> :ets.tab2list()
@@ -70,7 +77,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
       unless rows == [] do
         conflict_query =
-          from(usage in {table_name(), Record},
+          from(usage in {table_name(conf), Record},
             update: [
               set: [
                 last_evaluated_at:
@@ -83,11 +90,10 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
             ]
           )
 
-        repo().insert_all(
-          {table_name(), Record},
+        repo(conf).insert_all(
+          {table_name(conf), Record},
           rows,
-          on_conflict: conflict_query,
-          conflict_target: [:flag_name]
+          [on_conflict: conflict_query, conflict_target: [:flag_name]] ++ repo_opts(conf)
         )
       end
 
@@ -96,9 +102,37 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       _error -> :ok
     end
 
-    defp repo, do: Keyword.fetch!(Config.persistence(), :repo)
+    @doc "Default-instance form of `flush_all/2` (backward compatibility)."
+    @spec flush_all(atom) :: :ok
+    def flush_all(ets_table) when is_atom(ets_table), do: flush_all(Config.get(), ets_table)
 
-    defp table_name,
-      do: Keyword.get(Config.persistence(), :usage_table_name, "bandera_usage")
+    @doc false
+    # The usage table `conf` flushes into; two trackers may not share one. `nil`
+    # when no repo is configured yet (nothing to claim).
+    @spec storage_id(Config.t()) :: term | nil
+    def storage_id(%Config{} = conf) do
+      case Keyword.get(conf.persistence, :repo) do
+        nil ->
+          nil
+
+        repo ->
+          {__MODULE__, Bandera.Store.Persistent.Ecto.database_location(repo), prefix(conf),
+           table_name(conf)}
+      end
+    end
+
+    defp repo(conf), do: Keyword.fetch!(conf.persistence, :repo)
+
+    defp table_name(conf),
+      do: Keyword.get(conf.persistence, :usage_table_name, "bandera_usage")
+
+    defp prefix(conf), do: Keyword.get(conf.persistence, :prefix)
+
+    defp repo_opts(conf) do
+      case prefix(conf) do
+        nil -> []
+        prefix -> [prefix: prefix]
+      end
+    end
   end
 end

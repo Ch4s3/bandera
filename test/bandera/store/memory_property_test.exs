@@ -16,12 +16,14 @@ defmodule Bandera.Store.Persistent.MemoryPropertyTest do
             enabled <- boolean(),
             max_runs: 50
           ) do
-      {:ok, flag} = Memory.put(name, Gate.new(:boolean, enabled))
-      assert {:ok, ^flag} = Memory.get(name)
+      {:ok, flag} = Memory.put(conf(), name, Gate.new(:boolean, enabled))
+      assert {:ok, ^flag} = Memory.get(conf(), name)
       assert [%Gate{type: :boolean, enabled: ^enabled}] = flag.gates
 
-      {:ok, empty} = Memory.delete(name)
+      {:ok, empty} = Memory.delete(conf(), name)
       assert empty.gates == []
     end
   end
+
+  defp conf, do: Bandera.Config.get()
 end

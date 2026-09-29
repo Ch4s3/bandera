@@ -6,6 +6,10 @@ config :bandera, Bandera.TestRepo,
   database: Path.expand("../bandera_test.db", __DIR__),
   pool_size: 1
 
+config :bandera, Bandera.TestRepoAlias,
+  database: Path.expand("../bandera_test.db", __DIR__),
+  pool_size: 1
+
 config :bandera, Bandera.Dashboard.TestEndpoint,
   url: [host: "localhost"],
   secret_key_base: String.duplicate("a", 64),

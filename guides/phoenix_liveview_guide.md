@@ -187,3 +187,6 @@ Notes:
   specific user, useful for testing per-actor or per-group gates.
 - `register_and_log_in_user` is the `mix phx.gen.auth` helper; it puts the user
   in the session so `current_user` is assigned.
+- Testing a named instance (e.g. `MyApp.Flags`) works the same way — use
+  `use Bandera.Test, instance: MyApp.Flags` instead of `use Bandera.Test`; see
+  [Testing a named instance](multiple_instances_guide.md#testing-a-named-instance).

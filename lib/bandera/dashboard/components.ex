@@ -248,19 +248,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
-    @doc "Renders an amber warning banner when usage history is unavailable or loading."
+    @doc """
+    Renders an amber warning banner when usage history is unavailable or loading.
+    `instance` names the dashboard's bound instance, used only to tailor the
+    "not running" hint (the default instance keeps its historical wording).
+    """
     attr(:theme, :atom, default: :standalone)
     attr(:status, :atom, required: true)
+    attr(:instance, :atom, default: Bandera.Config.default_instance())
 
     @spec usage_warning(map()) :: Phoenix.LiveView.Rendered.t()
     def usage_warning(assigns) do
+      assigns = assign(assigns, :usage_child_spec, usage_child_spec(assigns.instance))
+
       ~H"""
       <div class={Theme.class(@theme, :flash_warn)}>
         <%= if @status == :loading do %>
           Usage history is loading. Stale and never-evaluated indicators will appear once
           persisted history is available.
         <% else %>
-          Stale flag detection is unavailable. Add <code>Bandera.Usage</code> to your
+          Stale flag detection is unavailable. Add <code>{@usage_child_spec}</code> to your
           supervision tree to enable it.
           <a href="https://hexdocs.pm/bandera/Bandera.Usage.html" target="_blank" rel="noopener">
             See the documentation →
@@ -268,6 +275,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <% end %>
       </div>
       """
+    end
+
+    defp usage_child_spec(instance) do
+      if instance == Bandera.Config.default_instance(),
+        do: "Bandera.Usage",
+        else: "{Bandera.Usage, instance: #{inspect(instance)}}"
     end
 
     attr(:pairs, :list, required: true)
@@ -291,18 +304,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @doc "Renders a stale hint icon with age for a flag known to be stale."
     attr(:flag_name, :atom, required: true)
     attr(:theme, :atom, default: :standalone)
+    attr(:instance, :atom, default: Bandera.Config.default_instance())
 
     @spec stale_indicator(map()) :: Phoenix.LiveView.Rendered.t()
     def stale_indicator(assigns) do
-      assigns = assign(assigns, :label, stale_label(assigns.flag_name))
+      assigns = assign(assigns, :label, stale_label(assigns.instance, assigns.flag_name))
 
       ~H"""
       <span class={Theme.class(@theme, :icon_hint)} title={@label}>⚠</span>
       """
     end
 
-    defp stale_label(flag_name) do
-      case Bandera.Dashboard.Stale.age_days(flag_name) do
+    defp stale_label(instance, flag_name) do
+      case Bandera.Dashboard.Stale.age_days(instance, flag_name) do
         :never -> "Never evaluated"
         {:ok, days} -> "Stale — last seen #{days}d ago"
       end

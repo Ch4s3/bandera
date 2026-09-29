@@ -43,16 +43,16 @@ defmodule Bandera.NotificationsTest do
   end
 
   test "TwoLevel.put publishes a change" do
-    {:ok, _} = TwoLevel.put(:f, Gate.new(:boolean, true))
+    {:ok, _} = TwoLevel.put(conf(), :f, Gate.new(:boolean, true))
     assert_received {:published, :f}
   end
 
   test "TwoLevel.delete/2 and delete/1 publish a change" do
-    {:ok, _} = TwoLevel.put(:f, Gate.new(:boolean, true))
+    {:ok, _} = TwoLevel.put(conf(), :f, Gate.new(:boolean, true))
     assert_received {:published, :f}
-    {:ok, _} = TwoLevel.delete(:f, Gate.new(:boolean, true))
+    {:ok, _} = TwoLevel.delete(conf(), :f, Gate.new(:boolean, true))
     assert_received {:published, :f}
-    {:ok, _} = TwoLevel.delete(:f)
+    {:ok, _} = TwoLevel.delete(conf(), :f)
     assert_received {:published, :f}
   end
 
@@ -66,7 +66,7 @@ defmodule Bandera.NotificationsTest do
       Bandera.reload_config()
 
       assert {:error, %RuntimeError{message: "boom"}} = Bandera.Notifications.publish_change(:x)
-      assert Bandera.RaisingNotifier.unique_id() == "raising"
+      assert Bandera.RaisingNotifier.unique_id(conf()) == "raising"
     end
 
     test "catches an :exit from the adapter and returns {:error, {:exit, reason}}" do
@@ -87,14 +87,16 @@ defmodule Bandera.NotificationsTest do
   end
 
   describe "Bandera.TestNotifier stub" do
-    test "publish_change/1 is a no-op when no pid is configured" do
+    test "publish_change/2 is a no-op when no pid is configured" do
       Application.delete_env(:bandera, :test_notifier_pid)
-      assert Bandera.TestNotifier.publish_change(:x) == :ok
+      assert Bandera.TestNotifier.publish_change(conf(), :x) == :ok
       refute_received {:published, :x}
     end
 
-    test "unique_id/0 returns a stable string" do
-      assert Bandera.TestNotifier.unique_id() == "test-notifier"
+    test "unique_id/1 returns a stable string" do
+      assert Bandera.TestNotifier.unique_id(conf()) == "test-notifier"
     end
   end
+
+  defp conf, do: Bandera.Config.get()
 end

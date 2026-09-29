@@ -3,6 +3,8 @@ defmodule Bandera.Audit do
   Opt-in audit hook. Turns Bandera's existing write telemetry
   (`[:bandera, :enable|:disable|:clear]` span `:stop` events) into structured
   `Bandera.Audit.Event` records and forwards them to a callback you provide.
+  Each event carries the `instance` the change was made on (`Bandera` for the
+  default instance); one handler sees the changes of every instance.
 
       Bandera.Audit.attach(:my_audit, fn event ->
         MyApp.AuditLog.insert!(event)
@@ -18,7 +20,7 @@ defmodule Bandera.Audit do
   defmodule Event do
     @moduledoc "A single flag-change audit record."
     @enforce_keys [:action, :flag_name, :at]
-    defstruct [:action, :flag_name, :options, :result, :actor, :at]
+    defstruct [:action, :flag_name, :options, :result, :actor, :at, instance: Bandera]
 
     @type t :: %__MODULE__{
             action: :enable | :disable | :clear,
@@ -26,7 +28,8 @@ defmodule Bandera.Audit do
             options: keyword,
             result: term,
             actor: term,
-            at: DateTime.t()
+            at: DateTime.t(),
+            instance: atom
           }
   end
 
@@ -43,7 +46,8 @@ defmodule Bandera.Audit do
       options: options,
       result: Map.get(metadata, :result),
       actor: Keyword.get(options, :by),
-      at: DateTime.utc_now()
+      at: DateTime.utc_now(),
+      instance: Map.get(metadata, :instance, Bandera)
     }
   end
 

@@ -90,7 +90,9 @@ bandera_dashboard "/flags", on_mount: {MyAppWeb.AdminAuth, :ensure_admin}
 ```
 
 Mount it more than once (e.g. per environment) by passing a distinct
-`:live_session_name`.
+`:live_session_name`. Mount a dashboard for a non-default instance by passing
+`instance: MyApp.Flags` — see the
+[Running Multiple Instances guide](multiple_instances_guide.md#dashboard-per-instance).
 
 ### 5. Visit it
 

@@ -9,29 +9,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @usage_refresh_interval 1_000
 
     @impl true
-    def mount(_params, _session, socket) do
-      usage_status = Bandera.Dashboard.Stale.usage_status()
+    def mount(_params, session, socket) do
+      instance = Map.get(session, "bandera_instance", Bandera.Config.default_instance())
+      conf = Bandera.Config.get(instance)
+      usage_status = Bandera.Dashboard.Stale.usage_status(instance)
 
       if connected?(socket) do
-        subscribe_to_changes()
+        subscribe_to_changes(conf)
         if usage_status == :loading, do: schedule_usage_refresh()
       end
 
       socket =
         socket
         |> assign(
+          instance: instance,
           search: "",
           expanded: MapSet.new(),
           collapsed_groups: MapSet.new(),
           actor_drafts: %{},
           group_drafts: %{},
-          theme: Bandera.Config.theme(),
+          theme: conf.theme,
           flash_error: nil,
           view: :cards,
           grouped: true,
           sort: :name,
           sort_dir: :asc,
-          stale_set: Bandera.Dashboard.Stale.stale_set(),
+          stale_set: Bandera.Dashboard.Stale.stale_set(instance),
           usage_status: usage_status,
           create_error: nil,
           similar_pairs: [],
@@ -97,7 +100,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           {@create_error}
         </div>
 
-        <.usage_warning :if={@usage_status != :ready} status={@usage_status} theme={@theme} />
+        <.usage_warning
+          :if={@usage_status != :ready}
+          status={@usage_status}
+          theme={@theme}
+          instance={@instance}
+        />
 
         <.similarity_warning :if={@similar_pairs != []} pairs={@similar_pairs} theme={@theme} />
 
@@ -151,6 +159,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                   :if={MapSet.member?(@stale_set, flag.name)}
                   flag_name={flag.name}
                   theme={@theme}
+                  instance={@instance}
                 />
                 <span :if={has_schedule?(flag)} class={Theme.class(@theme, :icon_hint)} title="Has a schedule">📅</span>
                 <span :if={has_prerequisites?(flag)} class={Theme.class(@theme, :icon_hint)} title="Has prerequisites">🔗</span>
@@ -199,6 +208,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                     :if={MapSet.member?(@stale_set, flag.name)}
                     flag_name={flag.name}
                     theme={@theme}
+                    instance={@instance}
                   />
                   <span :if={has_schedule?(flag)} class={Theme.class(@theme, :icon_hint)} title="Has a schedule">📅</span>
                   <span :if={has_prerequisites?(flag)} class={Theme.class(@theme, :icon_hint)} title="Has prerequisites">🔗</span>
@@ -265,7 +275,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                   <span class={Theme.class(@theme, :name)}>{flag.name}</span>
                 </td>
                 <td class={Theme.class(@theme, :td)}>{flag_state(flag)}</td>
-                <td class={Theme.class(@theme, :td)}>{format_age(flag.name)}</td>
+                <td class={Theme.class(@theme, :td)}>{format_age(@instance, flag.name)}</td>
                 <td class={Theme.class(@theme, :td)}>{if has_schedule?(flag), do: "📅", else: "—"}</td>
                 <td class={Theme.class(@theme, :td)}>{prerequisite_count(flag)}</td>
                 <td class={Theme.class(@theme, :td)}>
@@ -326,10 +336,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     def handle_event("toggle_boolean", %{"flag" => name}, socket) do
       flag_name = String.to_existing_atom(name)
+      instance = socket.assigns.instance
 
       if currently_on?(socket, name),
-        do: Bandera.disable(flag_name),
-        else: Bandera.enable(flag_name)
+        do: Bandera.disable(flag_name, instance: instance),
+        else: Bandera.enable(flag_name, instance: instance)
 
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
@@ -344,7 +355,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       if actor == "" do
         {:noreply, assign(socket, :flash_error, "Actor id can't be blank.")}
       else
-        Bandera.enable(String.to_existing_atom(name), for_actor: actor)
+        Bandera.enable(String.to_existing_atom(name),
+          for_actor: actor,
+          instance: socket.assigns.instance
+        )
 
         {:noreply,
          socket
@@ -355,16 +369,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     def handle_event("remove_actor", %{"flag" => name, "actor" => actor}, socket) do
-      Bandera.clear(String.to_existing_atom(name), for_actor: actor)
+      Bandera.clear(String.to_existing_atom(name),
+        for_actor: actor,
+        instance: socket.assigns.instance
+      )
+
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
 
     def handle_event("toggle_actor_gate", %{"flag" => name, "actor" => actor}, socket) do
       flag_name = String.to_existing_atom(name)
+      instance = socket.assigns.instance
 
       if gate_enabled?(socket, name, :actor, actor),
-        do: Bandera.disable(flag_name, for_actor: actor),
-        else: Bandera.enable(flag_name, for_actor: actor)
+        do: Bandera.disable(flag_name, for_actor: actor, instance: instance),
+        else: Bandera.enable(flag_name, for_actor: actor, instance: instance)
 
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
@@ -379,7 +398,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       if group == "" do
         {:noreply, assign(socket, :flash_error, "Group name can't be blank.")}
       else
-        Bandera.enable(String.to_existing_atom(name), for_group: group)
+        Bandera.enable(String.to_existing_atom(name),
+          for_group: group,
+          instance: socket.assigns.instance
+        )
 
         {:noreply,
          socket
@@ -390,16 +412,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     def handle_event("remove_group", %{"flag" => name, "group" => group}, socket) do
-      Bandera.clear(String.to_existing_atom(name), for_group: group)
+      Bandera.clear(String.to_existing_atom(name),
+        for_group: group,
+        instance: socket.assigns.instance
+      )
+
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
 
     def handle_event("toggle_group_gate", %{"flag" => name, "group" => group}, socket) do
       flag_name = String.to_existing_atom(name)
+      instance = socket.assigns.instance
 
       if gate_enabled?(socket, name, :group, group),
-        do: Bandera.disable(flag_name, for_group: group),
-        else: Bandera.enable(flag_name, for_group: group)
+        do: Bandera.disable(flag_name, for_group: group, instance: instance),
+        else: Bandera.enable(flag_name, for_group: group, instance: instance)
 
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
@@ -412,7 +439,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       with {pct, ""} <- Integer.parse(String.trim(percent)),
            true <- pct >= 1 and pct <= 99,
            {:ok, gate_kind} <- percentage_kind(kind) do
-        Bandera.enable(String.to_existing_atom(name), for_percentage_of: {gate_kind, pct / 100})
+        Bandera.enable(String.to_existing_atom(name),
+          for_percentage_of: {gate_kind, pct / 100},
+          instance: socket.assigns.instance
+        )
+
         {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
       else
         _ ->
@@ -422,7 +453,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     def handle_event("clear_percentage", %{"flag" => name}, socket) do
-      Bandera.clear(String.to_existing_atom(name), for_percentage: true)
+      Bandera.clear(String.to_existing_atom(name),
+        for_percentage: true,
+        instance: socket.assigns.instance
+      )
+
       {:noreply, refresh(socket)}
     end
 
@@ -434,7 +469,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       with variant when variant != "" <- String.trim(variant),
            {:ok, w} when w > 0 <- parse_number(String.trim(weight)) do
         weights = name |> current_weights(socket) |> Map.put(variant, w)
-        Bandera.put_variants(String.to_existing_atom(name), weights)
+
+        Bandera.put_variants(String.to_existing_atom(name), weights,
+          instance: socket.assigns.instance
+        )
+
         {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
       else
         _ ->
@@ -445,10 +484,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def handle_event("remove_variant", %{"flag" => name, "variant" => variant}, socket) do
       flag_name = String.to_existing_atom(name)
       weights = name |> current_weights(socket) |> Map.delete(variant)
+      instance = socket.assigns.instance
 
       if map_size(weights) == 0,
-        do: Bandera.clear(flag_name, variant: true),
-        else: Bandera.put_variants(flag_name, weights)
+        do: Bandera.clear(flag_name, variant: true, instance: instance),
+        else: Bandera.put_variants(flag_name, weights, instance: instance)
 
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
@@ -462,7 +502,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
            {:ok, operator} <- parse_operator(op) do
         constraint = Bandera.Constraint.new(attr, operator, parse_values(values))
         constraints = current_constraints(name, socket) ++ [constraint]
-        Bandera.enable(String.to_existing_atom(name), when: constraints)
+
+        Bandera.enable(String.to_existing_atom(name),
+          when: constraints,
+          instance: socket.assigns.instance
+        )
+
         {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
       else
         _ ->
@@ -476,10 +521,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {i, ""} ->
           flag_name = String.to_existing_atom(name)
           constraints = current_constraints(name, socket) |> List.delete_at(i)
+          instance = socket.assigns.instance
 
           if constraints == [],
-            do: Bandera.clear(flag_name, rule: true),
-            else: Bandera.enable(flag_name, when: constraints)
+            do: Bandera.clear(flag_name, rule: true, instance: instance),
+            else: Bandera.enable(flag_name, when: constraints, instance: instance)
 
           {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
 
@@ -494,13 +540,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           {:noreply, assign(socket, :flash_error, "Segment name can't be blank.")}
 
         seg ->
-          Bandera.enable(String.to_existing_atom(name), for_segment: seg)
+          Bandera.enable(String.to_existing_atom(name),
+            for_segment: seg,
+            instance: socket.assigns.instance
+          )
+
           {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
       end
     end
 
     def handle_event("remove_segment", %{"flag" => name, "segment" => segment}, socket) do
-      Bandera.clear(String.to_existing_atom(name), for_segment: segment)
+      Bandera.clear(String.to_existing_atom(name),
+        for_segment: segment,
+        instance: socket.assigns.instance
+      )
+
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
 
@@ -515,7 +569,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         parent ->
           Bandera.enable(String.to_existing_atom(name),
-            requires: {String.to_existing_atom(parent), required == "on"}
+            requires: {String.to_existing_atom(parent), required == "on"},
+            instance: socket.assigns.instance
           )
 
           {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
@@ -523,7 +578,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     def handle_event("remove_prerequisite", %{"flag" => name, "parent" => parent}, socket) do
-      Bandera.clear(String.to_existing_atom(name), requires: String.to_existing_atom(parent))
+      Bandera.clear(String.to_existing_atom(name),
+        requires: String.to_existing_atom(parent),
+        instance: socket.assigns.instance
+      )
+
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
 
@@ -534,13 +593,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       if is_nil(from) and is_nil(until) do
         {:noreply, assign(socket, :flash_error, "Set a start or an end for the schedule.")}
       else
-        Bandera.enable(String.to_existing_atom(name), schedule: {from, until})
+        Bandera.enable(String.to_existing_atom(name),
+          schedule: {from, until},
+          instance: socket.assigns.instance
+        )
+
         {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
       end
     end
 
     def handle_event("clear_schedule", %{"flag" => name}, socket) do
-      Bandera.clear(String.to_existing_atom(name), schedule: true)
+      Bandera.clear(String.to_existing_atom(name),
+        schedule: true,
+        instance: socket.assigns.instance
+      )
+
       {:noreply, socket |> assign(:flash_error, nil) |> refresh()}
     end
 
@@ -568,7 +635,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           # matching ~r/^[a-z][a-z0-9_.]*$/, only reachable from an authenticated dashboard session.
           flag_atom = String.to_atom(name)
 
-          case Bandera.disable(flag_atom) do
+          case Bandera.disable(flag_atom, instance: socket.assigns.instance) do
             {:ok, _} ->
               {:noreply, socket |> assign(:create_error, nil) |> refresh()}
 
@@ -592,7 +659,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     def handle_event("clear_flag", %{"flag" => name}, socket) do
       flag_name = String.to_existing_atom(name)
-      Bandera.clear(flag_name)
+      Bandera.clear(flag_name, instance: socket.assigns.instance)
 
       {:noreply,
        socket
@@ -620,8 +687,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # ---- assigns helpers ----
 
     defp load_flags(socket) do
+      instance = socket.assigns.instance
+
       flags =
-        case Bandera.all_flags() do
+        case Bandera.all_flags(instance: instance) do
           {:ok, flags} -> flags
           {:error, _} -> []
         end
@@ -638,7 +707,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp recompute_groups(socket) do
       separator =
         if socket.assigns.grouped and socket.assigns.view == :cards,
-          do: Bandera.Config.group_separator(),
+          do: Bandera.Config.get(socket.assigns.instance).group_separator,
           else: nil
 
       filtered =
@@ -650,7 +719,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       groups =
         if socket.assigns.view == :table do
-          apply_table_sort(grouped, socket.assigns.sort, socket.assigns.sort_dir)
+          apply_table_sort(
+            socket.assigns.instance,
+            grouped,
+            socket.assigns.sort,
+            socket.assigns.sort_dir
+          )
         else
           grouped
         end
@@ -658,7 +732,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       assign(socket, :groups, groups)
     end
 
-    defp apply_table_sort(groups, sort, dir) do
+    defp apply_table_sort(instance, groups, sort, dir) do
       Enum.map(groups, fn {group, members} ->
         sorted =
           case sort do
@@ -672,7 +746,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               Enum.sort_by(
                 members,
                 fn {_display, flag} ->
-                  case Bandera.Dashboard.Stale.age_days(flag.name) do
+                  case Bandera.Dashboard.Stale.age_days(instance, flag.name) do
                     :never -> nil
                     {:ok, days} -> days
                   end
@@ -806,9 +880,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp refresh_usage(socket) do
+      instance = socket.assigns.instance
+
       assign(socket,
-        stale_set: Bandera.Dashboard.Stale.stale_set(),
-        usage_status: Bandera.Dashboard.Stale.usage_status()
+        stale_set: Bandera.Dashboard.Stale.stale_set(instance),
+        usage_status: Bandera.Dashboard.Stale.usage_status(instance)
       )
     end
 
@@ -816,12 +892,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp parse_sort("state"), do: :state
     defp parse_sort(_), do: :name
 
-    @change_topic "bandera:changes"
-
-    defp subscribe_to_changes do
-      with true <- Bandera.Config.notifications_adapter() == Bandera.Notifications.PhoenixPubSub,
-           client when not is_nil(client) <- Keyword.get(Bandera.Config.notifications(), :client) do
-        Phoenix.PubSub.subscribe(client, @change_topic)
+    defp subscribe_to_changes(conf) do
+      with true <- conf.notifications_adapter == Bandera.Notifications.PhoenixPubSub,
+           client when not is_nil(client) <- Keyword.get(conf.notifications, :client) do
+        Phoenix.PubSub.subscribe(client, Bandera.Notifications.topic(conf))
       else
         _ -> :ok
       end
@@ -853,8 +927,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    defp format_age(flag_name) do
-      case Bandera.Dashboard.Stale.age_days(flag_name) do
+    defp format_age(instance, flag_name) do
+      case Bandera.Dashboard.Stale.age_days(instance, flag_name) do
         :never -> "—"
         {:ok, days} -> "#{days}d ago"
       end

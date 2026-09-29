@@ -191,4 +191,97 @@ defmodule Bandera.Ecto.MigrationsTest do
       )
     end
   end
+
+  describe "options (:table, :usage_table, :prefix) for a named instance's own tables" do
+    defmodule NamedInstanceMigration do
+      use Ecto.Migration
+
+      @spec up() :: :ok
+      def up do
+        Bandera.Ecto.Migrations.up(table: "named_flags", usage_table: "named_usage")
+      end
+
+      @spec down() :: :ok
+      def down do
+        Bandera.Ecto.Migrations.down(table: "named_flags", usage_table: "named_usage")
+      end
+    end
+
+    setup do
+      Ecto.Migrator.run(
+        Bandera.TestRepo,
+        [{20_260_801_000_000, NamedInstanceMigration}],
+        :up,
+        all: true,
+        log: false
+      )
+
+      on_exit(fn ->
+        Ecto.Migrator.run(
+          Bandera.TestRepo,
+          [{20_260_801_000_000, NamedInstanceMigration}],
+          :down,
+          all: true,
+          log: false
+        )
+      end)
+
+      :ok
+    end
+
+    test "up/1 creates the flags table under the given name, with its unique index" do
+      %{rows: rows} =
+        Bandera.TestRepo.query!("SELECT flag_name, gate_type, target, enabled FROM named_flags")
+
+      assert rows == []
+      assert "value" in column_names("named_flags")
+
+      %{rows: rows} =
+        Bandera.TestRepo.query!(
+          "SELECT name FROM sqlite_master WHERE type='index' AND name='named_flags_flag_name_gate_target_idx'"
+        )
+
+      assert rows == [["named_flags_flag_name_gate_target_idx"]]
+    end
+
+    test "up/1 also creates the usage table under the given name" do
+      %{rows: rows} =
+        Bandera.TestRepo.query!("SELECT flag_name, last_evaluated_at FROM named_usage")
+
+      assert rows == []
+    end
+
+    test "unspecified options still fall back to the default instance's configured names" do
+      # The default-instance tables from the suite's main migration coexist untouched.
+      assert Bandera.TestRepo.query!("SELECT * FROM bandera_flags").rows == []
+      assert Bandera.TestRepo.query!("SELECT * FROM bandera_usage").rows == []
+    end
+  end
+
+  describe "prefix option" do
+    defmodule PrefixedFixMigration do
+      use Ecto.Migration
+
+      @spec up() :: :ok
+      def up, do: Bandera.Ecto.Migrations.fix_fun_with_flags_boolean_gates(prefix: "tenant_a")
+    end
+
+    test "fix_fun_with_flags_boolean_gates/1 qualifies the table in its raw SQL when a prefix is given" do
+      # SQLite has no schema concept, so we can't exercise a real prefixed table —
+      # assert only that the generated SQL is schema-qualified: a query aimed at
+      # "tenant_a.bandera_flags" fails because no such (attached) schema exists,
+      # which is only possible if the table name was actually qualified.
+      assert_raise Exqlite.Error, ~r/unknown database tenant_a|no such table/, fn ->
+        Ecto.Migrator.run(
+          Bandera.TestRepo,
+          [{20_260_801_000_001, PrefixedFixMigration}],
+          :up,
+          all: true,
+          log: false
+        )
+      end
+
+      Bandera.TestRepo.query!("DELETE FROM schema_migrations WHERE version = 20260801000001")
+    end
+  end
 end

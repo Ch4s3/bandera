@@ -22,8 +22,11 @@ defmodule Bandera.ApplicationTest do
     :ok
   end
 
-  test "the application seeded the Config snapshot at boot" do
-    assert is_map(:persistent_term.get({Bandera.Config, :snapshot}, nil))
+  test "the application started the storage-claims registry" do
+    # It runs even with `start_on_boot: false` (as in this test env), so instances
+    # started by the host app can claim their storage.
+    assert is_pid(Process.whereis(Bandera.Registry))
+    refute Process.whereis(Bandera.Instance)
   end
 
   test "end-to-end flag toggle works through the full stack" do

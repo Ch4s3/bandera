@@ -10,20 +10,20 @@ defmodule Bandera.FailingStore do
   @error {:error, :boom}
 
   @impl true
-  def lookup(_flag_name), do: @error
+  def lookup(_conf, _flag_name), do: @error
 
   @impl true
-  def put(_flag_name, _gate), do: @error
+  def put(_conf, _flag_name, _gate), do: @error
 
   @impl true
-  def delete(_flag_name, _gate), do: @error
+  def delete(_conf, _flag_name, _gate), do: @error
 
   @impl true
-  def delete(_flag_name), do: @error
+  def delete(_conf, _flag_name), do: @error
 
   @impl true
-  def all_flags, do: @error
+  def all_flags(_conf), do: @error
 
   @impl true
-  def all_flag_names, do: @error
+  def all_flag_names(_conf), do: @error
 end

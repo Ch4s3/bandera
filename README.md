@@ -137,6 +137,31 @@ binds the table at runtime, with no database-specific SQL. It works with any
 Ecto SQL database — Postgres (via `:postgrex`) or SQLite (via `:ecto_sqlite3`).
 SQLite is the backend Bandera's own test suite runs against.
 
+### Multiple instances
+
+Every Bandera function accepts an `instance:` option, defaulting to the
+default instance configured above. To run several isolated flag sets in one
+VM (e.g. one per app in an umbrella), define a module per instance:
+
+```elixir
+defmodule MyApp.Flags do
+  use Bandera, otp_app: :my_app
+end
+
+# config/config.exs
+config :my_app, MyApp.Flags,
+  persistence: [adapter: Bandera.Store.Persistent.Ecto, repo: MyApp.Repo,
+                ecto_table_name: "my_app_flags"]
+
+# application.ex
+children = [MyApp.Repo, MyApp.Flags]
+```
+
+`MyApp.Flags.enabled?(:checkout)` and friends then work against that
+instance's own storage, cache, and notifications. See the
+[Running Multiple Instances guide](guides/multiple_instances_guide.md) for
+per-backend isolation, the dashboard, testing, and a full umbrella example.
+
 ## Usage
 
 Once installed, the whole API lives on the `Bandera` module.
@@ -505,6 +530,7 @@ In-depth guides:
   segments, prerequisites, scheduling, audit log, and stale-flag tooling
 - [Using Bandera with Phoenix LiveView](guides/phoenix_liveview_guide.md)
 - [Flag Dashboard (LiveView UI)](guides/dashboard_guide.md)
+- [Running Multiple Instances](guides/multiple_instances_guide.md)
 - [Migration from fun_with_flags](guides/migration_guide.md)
 
 Generate docs locally with [ExDoc](https://github.com/elixir-lang/ex_doc):

@@ -42,8 +42,10 @@ end)
 ```
 
 Each `%Bandera.Audit.Event{}` carries `:action` (`:enable | :disable | :clear`),
-`:flag_name`, `:options`, `:result`, `:actor`, and `:at` (a `DateTime`). Record *who*
-made a change by passing `by:` to any write:
+`:flag_name`, `:options`, `:result`, `:actor`, `:at` (a `DateTime`), and
+`:instance` (running [multiple instances](multiple_instances_guide.md)? one
+handler sees every instance's changes). Record *who* made a change by passing
+`by:` to any write:
 
 ```elixir
 Bandera.enable(:promo, by: "admin@example.com")
@@ -183,3 +185,7 @@ mix bandera.flags --stale --older-than 30
 
 `Bandera.Usage` is entirely opt-in: if it isn't running, `stale_flags/1` treats every
 flag as never-evaluated and the mix task prints a warning.
+
+Running several instances? Start a tracker per instance with
+`{Bandera.Usage, instance: MyApp.Flags}` — see
+[Usage per instance](multiple_instances_guide.md#usage-stale-flag-tracking-per-instance).

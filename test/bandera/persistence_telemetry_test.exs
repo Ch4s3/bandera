@@ -43,7 +43,7 @@ defmodule Bandera.PersistenceTelemetryTest do
   end
 
   test "put emits a persistence put span" do
-    {:ok, _} = TwoLevel.put(:f, Gate.new(:boolean, true))
+    {:ok, _} = TwoLevel.put(conf(), :f, Gate.new(:boolean, true))
 
     assert_receive {:telemetry, [:bandera, :persistence, :put, :start], _m,
                     %{flag_name: :f, gate: %Gate{}}}
@@ -55,34 +55,34 @@ defmodule Bandera.PersistenceTelemetryTest do
   end
 
   test "get fires on a cache MISS but not on a cache HIT" do
-    {:ok, _} = TwoLevel.put(:f, Gate.new(:boolean, true))
+    {:ok, _} = TwoLevel.put(conf(), :f, Gate.new(:boolean, true))
     Cache.flush()
 
     # miss -> reads persistent -> :get event
-    {:ok, _} = TwoLevel.lookup(:f)
+    {:ok, _} = TwoLevel.lookup(conf(), :f)
     assert_receive {:telemetry, [:bandera, :persistence, :get], meas, %{flag_name: :f}}
     assert is_integer(meas.system_time)
 
     # now cached -> hit -> NO :get event
-    {:ok, _} = TwoLevel.lookup(:f)
+    {:ok, _} = TwoLevel.lookup(conf(), :f)
     refute_receive {:telemetry, [:bandera, :persistence, :get], _m, _meta}
   end
 
   test "delete, all_flags, all_flag_names emit spans" do
-    {:ok, _} = TwoLevel.put(:f, Gate.new(:boolean, true))
-    {:ok, _} = TwoLevel.delete(:f)
+    {:ok, _} = TwoLevel.put(conf(), :f, Gate.new(:boolean, true))
+    {:ok, _} = TwoLevel.delete(conf(), :f)
     assert_receive {:telemetry, [:bandera, :persistence, :delete, :stop], _m, %{flag_name: :f}}
 
-    {:ok, _} = TwoLevel.all_flags()
+    {:ok, _} = TwoLevel.all_flags(conf())
     assert_receive {:telemetry, [:bandera, :persistence, :all_flags, :stop], _m, _meta}
 
-    {:ok, _} = TwoLevel.all_flag_names()
+    {:ok, _} = TwoLevel.all_flag_names(conf())
     assert_receive {:telemetry, [:bandera, :persistence, :all_flag_names, :stop], _m, _meta}
   end
 
   test "delete/2 emits a delete span carrying the gate" do
-    {:ok, _} = TwoLevel.put(:f, Gate.new(:actor, %{id: 1}, true))
-    {:ok, _} = TwoLevel.delete(:f, Gate.new(:actor, %{id: 1}, true))
+    {:ok, _} = TwoLevel.put(conf(), :f, Gate.new(:actor, %{id: 1}, true))
+    {:ok, _} = TwoLevel.delete(conf(), :f, Gate.new(:actor, %{id: 1}, true))
 
     assert_receive {:telemetry, [:bandera, :persistence, :delete, :start], _m,
                     %{flag_name: :f, gate: %Gate{type: :actor}}}
@@ -92,11 +92,13 @@ defmodule Bandera.PersistenceTelemetryTest do
   end
 
   test "get fires when the cache is disabled" do
-    {:ok, _} = TwoLevel.put(:f, Gate.new(:boolean, true))
+    {:ok, _} = TwoLevel.put(conf(), :f, Gate.new(:boolean, true))
     Application.put_env(:bandera, :cache, enabled: false, ttl: 900)
     Bandera.reload_config()
 
-    {:ok, _} = TwoLevel.lookup(:f)
+    {:ok, _} = TwoLevel.lookup(conf(), :f)
     assert_receive {:telemetry, [:bandera, :persistence, :get], _meas, %{flag_name: :f}}
   end
+
+  defp conf, do: Bandera.Config.get()
 end
