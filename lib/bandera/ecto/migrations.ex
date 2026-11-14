@@ -15,7 +15,9 @@ if Code.ensure_loaded?(Ecto.Migration) do
 
     Table names are read at runtime from `config :bandera, persistence: [...]`
     (`ecto_table_name`, default `"bandera_flags"`; `usage_table_name`, default
-    `"bandera_usage"`), so they are never fixed at compile time.
+    `"bandera_usage"`), so they are never fixed at compile time. With
+    `prefix: "my_schema"` the tables are created in that schema (PostgreSQL) or
+    attached database (SQLite), where the adapter then reads and writes them.
     """
 
     import Ecto.Migration
@@ -31,7 +33,7 @@ if Code.ensure_loaded?(Ecto.Migration) do
     def up do
       table_name = Bandera.Config.ecto_table_name()
 
-      create_if_not_exists table(table_name) do
+      create_if_not_exists table(table_name, prefix: schema_prefix()) do
         add(:flag_name, :string, null: false)
         add(:gate_type, :string, null: false)
         add(:target, :string, null: false)
@@ -41,7 +43,8 @@ if Code.ensure_loaded?(Ecto.Migration) do
 
       create_if_not_exists(
         unique_index(table_name, [:flag_name, :gate_type, :target],
-          name: :"#{table_name}_flag_name_gate_target_idx"
+          name: :"#{table_name}_flag_name_gate_target_idx",
+          prefix: schema_prefix()
         )
       )
 
@@ -66,7 +69,7 @@ if Code.ensure_loaded?(Ecto.Migration) do
     """
     @spec upgrade_v2() :: :ok
     def upgrade_v2 do
-      alter table(Bandera.Config.ecto_table_name()) do
+      alter table(Bandera.Config.ecto_table_name(), prefix: schema_prefix()) do
         add(:value, :string)
       end
 
@@ -96,7 +99,7 @@ if Code.ensure_loaded?(Ecto.Migration) do
     """
     @spec fix_fun_with_flags_boolean_gates() :: :ok
     def fix_fun_with_flags_boolean_gates do
-      table = Bandera.Config.ecto_table_name()
+      table = qualified(Bandera.Config.ecto_table_name())
       # `table` is developer-controlled config; '_bandera_none' is a fixed sentinel.
 
       # When both a legacy row and a Bandera row exist for the same flag, delete
@@ -143,7 +146,7 @@ if Code.ensure_loaded?(Ecto.Migration) do
     def up_usage do
       table_name = usage_table_name()
 
-      create_if_not_exists table(table_name, primary_key: false) do
+      create_if_not_exists table(table_name, primary_key: false, prefix: schema_prefix()) do
         add(:flag_name, :string, primary_key: true, null: false)
         add(:last_evaluated_at, :utc_datetime_usec, null: false)
       end
@@ -154,7 +157,7 @@ if Code.ensure_loaded?(Ecto.Migration) do
     @doc "Drops the usage table."
     @spec down_usage() :: :ok
     def down_usage do
-      drop(table(usage_table_name()))
+      drop(table(usage_table_name(), prefix: schema_prefix()))
       :ok
     end
 
@@ -165,7 +168,7 @@ if Code.ensure_loaded?(Ecto.Migration) do
     @spec down() :: :ok
     def down do
       down_usage()
-      drop(table(Bandera.Config.ecto_table_name()))
+      drop(table(Bandera.Config.ecto_table_name(), prefix: schema_prefix()))
       :ok
     end
 
@@ -173,6 +176,17 @@ if Code.ensure_loaded?(Ecto.Migration) do
       :bandera
       |> Application.get_env(:persistence, [])
       |> Keyword.get(:usage_table_name, "bandera_usage")
+    end
+
+    # The schema the tables live in (`persistence: [prefix: ...]`); nil is the
+    # repo's default.
+    defp schema_prefix, do: Bandera.Config.ecto_prefix()
+
+    defp qualified(table) do
+      case schema_prefix() do
+        nil -> table
+        prefix -> "#{prefix}.#{table}"
+      end
     end
   end
 end

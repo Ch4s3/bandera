@@ -75,6 +75,22 @@ defmodule Bandera.Config do
   @spec ecto_table_name() :: String.t()
   def ecto_table_name, do: Keyword.get(persistence(), :ecto_table_name, "bandera_flags")
 
+  @doc """
+  The schema the Ecto adapter's tables live in (`persistence: [prefix: ...]`),
+  or `nil` for the repo's default.
+  """
+  @spec ecto_prefix() :: String.t() | nil
+  def ecto_prefix, do: Keyword.get(persistence(), :prefix)
+
+  @doc "Options the Ecto adapter passes on every repo call: the `:prefix`, when one is set."
+  @spec ecto_repo_opts() :: keyword
+  def ecto_repo_opts do
+    case ecto_prefix() do
+      nil -> []
+      prefix -> [prefix: prefix]
+    end
+  end
+
   @doc "Whether cross-node cache-busting notifications are enabled (default `false`)."
   @spec notifications_enabled?() :: boolean
   def notifications_enabled?, do: snapshot().notifications_enabled?
