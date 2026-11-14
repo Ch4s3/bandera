@@ -564,18 +564,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
            )}
 
         true ->
-          # String.to_atom is safe here: input is restricted to at most 64 characters
-          # matching ~r/^[a-z][a-z0-9_.]*$/, only reachable from an authenticated dashboard session.
-          flag_atom = String.to_atom(name)
-
-          case Bandera.disable(flag_atom) do
-            {:ok, _} ->
-              {:noreply, socket |> assign(:create_error, nil) |> refresh()}
-
-            {:error, reason} ->
-              {:noreply,
-               assign(socket, :create_error, "Failed to create flag: #{inspect(reason)}")}
-          end
+          create_unless_stored(name, socket)
       end
     end
 
@@ -598,6 +587,39 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
        socket
        |> update(:expanded, &MapSet.delete(&1, name))
        |> refresh()}
+    end
+
+    # Creating a flag writes its boolean gate off, so it must not run for a flag
+    # the store already holds: that would switch a flag that is on off for
+    # everyone. Asks the persistent store (all_flag_names/0 skips the node cache),
+    # so a flag another node just wrote counts too.
+    defp create_unless_stored(name, socket) do
+      case Bandera.all_flag_names() do
+        {:ok, names} ->
+          if Enum.any?(names, &(Atom.to_string(&1) == name)) do
+            {:noreply,
+             assign(socket, :create_error, "That flag already exists, so nothing was changed.")}
+          else
+            create(name, socket)
+          end
+
+        {:error, reason} ->
+          {:noreply, assign(socket, :create_error, "Failed to create flag: #{inspect(reason)}")}
+      end
+    end
+
+    defp create(name, socket) do
+      # String.to_atom is safe here: input is restricted to at most 64 characters
+      # matching ~r/^[a-z][a-z0-9_.]*$/, only reachable from an authenticated dashboard session.
+      flag_atom = String.to_atom(name)
+
+      case Bandera.disable(flag_atom) do
+        {:ok, _} ->
+          {:noreply, socket |> assign(:create_error, nil) |> refresh()}
+
+        {:error, reason} ->
+          {:noreply, assign(socket, :create_error, "Failed to create flag: #{inspect(reason)}")}
+      end
     end
 
     @impl true
