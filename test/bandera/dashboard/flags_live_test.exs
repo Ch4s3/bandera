@@ -721,6 +721,27 @@ defmodule Bandera.Dashboard.FlagsLiveTest do
       assert html =~ "billing.invoices_v2"
     end
 
+    test "an existing flag's name leaves the flag as it is and says it exists", %{conn: conn} do
+      {:ok, true} = Bandera.enable(:already_on)
+      {:ok, live, _html} = live(conn, "/flags")
+
+      html = render_submit(live, "create_flag", %{"flag_name" => "already_on"})
+
+      assert Bandera.enabled?(:already_on)
+      assert html =~ "already exists"
+    end
+
+    test "an existing flag with only an actor gate gets no boolean gate", %{conn: conn} do
+      {:ok, true} = Bandera.enable(:actor_only, for_actor: "user-1")
+      {:ok, live, _html} = live(conn, "/flags")
+
+      html = render_submit(live, "create_flag", %{"flag_name" => "actor_only"})
+
+      {:ok, flag} = Bandera.get_flag(:actor_only)
+      assert [%{type: :actor}] = flag.gates
+      assert html =~ "already exists"
+    end
+
     test "name exceeding 64 characters shows inline error", %{conn: conn} do
       {:ok, live, _html} = live(conn, "/flags")
       long_name = String.duplicate("a", 65)
