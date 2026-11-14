@@ -35,7 +35,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     @spec load_into_ets(atom) :: :ok
     @spec load_into_ets(atom, keyword) :: :ok | {:error, term}
     def load_into_ets(ets_table, opts \\ []) do
-      rows = repo().all(from(r in {table_name(), Record}))
+      rows = repo().all(from(r in {table_name(), Record}), Config.ecto_repo_opts())
 
       for %Record{flag_name: name, last_evaluated_at: db_at} <- rows do
         atom = String.to_atom(name)
@@ -86,8 +86,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
         repo().insert_all(
           {table_name(), Record},
           rows,
-          on_conflict: conflict_query,
-          conflict_target: [:flag_name]
+          [on_conflict: conflict_query, conflict_target: [:flag_name]] ++ Config.ecto_repo_opts()
         )
       end
 

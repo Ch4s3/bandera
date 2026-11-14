@@ -13,7 +13,10 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
           persistence: [
             adapter: Bandera.Store.Persistent.Ecto,
             repo: MyApp.Repo,
-            ecto_table_name: "bandera_flags"
+            ecto_table_name: "bandera_flags",
+            # optional: the schema (PostgreSQL) or attached database (SQLite)
+            # the tables live in; the repo's default when unset
+            prefix: "my_schema"
           ]
 
     Run `Bandera.Ecto.Migrations.up/0` from a migration to create the table.
@@ -49,7 +52,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     @impl Bandera.Store.Persistent
     def get(flag_name) do
       name = to_string(flag_name)
-      records = repo().all(from(r in {table(), Record}, where: r.flag_name == ^name))
+      records = all(from(r in {table(), Record}, where: r.flag_name == ^name))
       {:ok, Serializer.deserialize_flag(flag_name, records)}
     end
 
@@ -60,13 +63,13 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       row = Serializer.to_row(flag_name, gate)
 
       case repo().transaction(fn ->
-             repo().delete_all(
+             delete_all(
                from(r in {table(), Record},
                  where: r.flag_name == ^name and r.gate_type == "percentage"
                )
              )
 
-             repo().insert_all({table(), Record}, [row])
+             insert_all({table(), Record}, [row])
            end) do
         {:ok, _} -> get(flag_name)
         {:error, reason} -> {:error, reason}
@@ -96,13 +99,13 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       sentinel = Serializer.serialize_target(nil)
       row = Serializer.to_row(flag_name, gate)
 
-      repo().delete_all(
+      delete_all(
         from(r in {table(), Record},
           where: r.flag_name == ^name and r.gate_type == "boolean" and r.target != ^sentinel
         )
       )
 
-      repo().insert_all({table(), Record}, [row],
+      insert_all({table(), Record}, [row],
         on_conflict: {:replace, [:enabled, :value]},
         conflict_target: [:flag_name, :gate_type, :target]
       )
@@ -114,7 +117,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     def put(flag_name, %Gate{} = gate) do
       row = Serializer.to_row(flag_name, gate)
 
-      repo().insert_all({table(), Record}, [row],
+      insert_all({table(), Record}, [row],
         on_conflict: {:replace, [:enabled, :value]},
         conflict_target: [:flag_name, :gate_type, :target]
       )
@@ -127,7 +130,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
         when type in [:percentage_of_time, :percentage_of_actors] do
       name = to_string(flag_name)
 
-      repo().delete_all(
+      delete_all(
         from(r in {table(), Record}, where: r.flag_name == ^name and r.gate_type == "percentage")
       )
 
@@ -140,7 +143,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       gate_type = to_string(gate.type)
       target = Serializer.serialize_target(gate.for)
 
-      repo().delete_all(
+      delete_all(
         from(r in {table(), Record},
           where: r.flag_name == ^name and r.gate_type == ^gate_type and r.target == ^target
         )
@@ -152,7 +155,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     @impl Bandera.Store.Persistent
     def delete(flag_name) do
       name = to_string(flag_name)
-      repo().delete_all(from(r in {table(), Record}, where: r.flag_name == ^name))
+      delete_all(from(r in {table(), Record}, where: r.flag_name == ^name))
       {:ok, Flag.new(flag_name, [])}
     end
 
@@ -160,7 +163,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     def all_flags do
       flags =
         from(r in {table(), Record})
-        |> repo().all()
+        |> all()
         |> Enum.group_by(& &1.flag_name)
         |> Enum.map(fn {name, records} -> Serializer.deserialize_flag(name, records) end)
 
@@ -171,13 +174,22 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     def all_flag_names do
       names =
         from(r in {table(), Record}, select: r.flag_name, distinct: true)
-        |> repo().all()
+        |> all()
         |> Enum.map(&String.to_atom/1)
 
       {:ok, names}
     end
 
     defp repo, do: Keyword.fetch!(Config.persistence(), :repo)
+
+    # Every query and insert goes through these, so the configured `:prefix`
+    # (the schema the table lives in) reaches each of them.
+    defp all(query), do: repo().all(query, Config.ecto_repo_opts())
+    defp delete_all(query), do: repo().delete_all(query, Config.ecto_repo_opts())
+
+    defp insert_all(source, rows, opts \\ []),
+      do: repo().insert_all(source, rows, opts ++ Config.ecto_repo_opts())
+
     defp table, do: Config.ecto_table_name()
   end
 end
